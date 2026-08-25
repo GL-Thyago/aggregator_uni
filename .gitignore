@@ -5,6 +5,7 @@ generated/
 *.log
 .DS_Store
 data/covers/
+data/salsa-catalog-cache.json
 tools/cloudflared.exe
 
 # jogos locais

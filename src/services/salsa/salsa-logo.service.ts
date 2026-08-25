@@ -39,7 +39,7 @@ function parseBase64Logo(raw: string): Buffer | null {
   if (!trimmed || trimmed.length < 32) return null;
   const dataUri = trimmed.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s);
   const b64 = dataUri ? dataUri[2] : trimmed.replace(/\s/g, "");
-  if (!/^[A-Za-z0-9+/]+=*$/.test(b64.slice(0, 80))) return null;
+  if (!b64 || !/^[A-Za-z0-9+/]+=*$/.test(b64.slice(0, 80))) return null;
   try {
     const buf = Buffer.from(b64, "base64");
     return buf.length > 24 ? buf : null;

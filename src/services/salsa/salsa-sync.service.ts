@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import axios from "axios";
 import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
@@ -26,10 +28,25 @@ function mapCategory(category?: string): { slug: string; name: string; gameType:
   return { slug: "slots", name: "Slots", gameType: "SLOT" };
 }
 
+function pickString(g: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = g[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  for (const [key, value] of Object.entries(g)) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    if (keys.some((k) => k.toLowerCase() === key.toLowerCase())) return value.trim();
+  }
+  return null;
+}
+
 function resolveSalsaLogo(slug: string, g: SalsaGameJson): string | null {
+  const rec = g as unknown as Record<string, unknown>;
   return persistSalsaLogo(slug, {
-    gameLogoUrl: g.gameLogoUrl ?? g.logo ?? g.imageUrl ?? g.image ?? g.icon ?? null,
-    gameLogo: g.gameLogo ?? null,
+    gameLogoUrl:
+      pickString(rec, "gameLogoUrl", "GameLogoUrl", "logo", "imageUrl", "image", "icon", "thumbnail", "thumbnailUrl") ??
+      null,
+    gameLogo: pickString(rec, "gameLogo", "GameLogo") ?? null,
   });
 }
 
@@ -60,8 +77,17 @@ interface SalsaProviderJson {
   games: SalsaGameJson[];
 }
 
-const SALSA_PROVIDER_SCAN_MAX = 80;
-const SALSA_PROVIDER_EMPTY_STOP = 5;
+const CATALOG_CACHE_PATH = path.resolve(process.cwd(), "data", "salsa-catalog-cache.json");
+const SCAN_CONCURRENCY = 4;
+
+type SalsaCatalogSnapshot = {
+  providers: SalsaProviderJson[];
+  scanned: number;
+  foundIds: number[];
+  fetchedAt?: string;
+  fromCache?: boolean;
+  rateLimited?: string | null;
+};
 
 function catalogBaseUrl(raw: string): URL {
   const url = new URL(raw);
@@ -69,68 +95,153 @@ function catalogBaseUrl(raw: string): URL {
   return url;
 }
 
-async function fetchSalsaProviderPage(base: URL, providerId: number): Promise<SalsaProviderJson[]> {
-  const url = new URL(base);
-  url.searchParams.set("provider", String(providerId));
+function salsaRateLimitMessage(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const msg = "error" in data ? String((data as { error?: unknown }).error ?? "") : "";
+  if (/must wait 24h/i.test(msg)) return msg;
+  return null;
+}
+
+function loadCatalogCache(): SalsaCatalogSnapshot | null {
   try {
-    const { data, status } = await axios.get<{ data?: { providers?: SalsaProviderJson[] } }>(url.toString(), {
-      timeout: 120_000,
-      maxContentLength: 80 * 1024 * 1024,
-      maxBodyLength: 80 * 1024 * 1024,
-      validateStatus: (s) => s < 500,
-    });
-    if (status >= 400) return [];
-    return (data?.data?.providers ?? []).filter((p) => p?.providerName && (p.games?.length ?? 0) > 0);
+    if (!fs.existsSync(CATALOG_CACHE_PATH)) return null;
+    const parsed = JSON.parse(fs.readFileSync(CATALOG_CACHE_PATH, "utf8")) as SalsaCatalogSnapshot;
+    if (!Array.isArray(parsed.providers) || !parsed.providers.length) return null;
+    return parsed;
   } catch {
-    return [];
+    return null;
   }
 }
 
-/** A Salsa exige `provider=N` por request. Sem o param a API devolve 400. */
-export async function fetchAllSalsaProviders(rawUrl: string): Promise<{
-  providers: SalsaProviderJson[];
-  scanned: number;
-  foundIds: number[];
-}> {
-  const base = catalogBaseUrl(rawUrl);
-  const bySlug = new Map<string, SalsaProviderJson>();
-  const foundIds: number[] = [];
-  let emptyStreak = 0;
-  let scanned = 0;
+function saveCatalogCache(snapshot: SalsaCatalogSnapshot) {
+  fs.mkdirSync(path.dirname(CATALOG_CACHE_PATH), { recursive: true });
+  fs.writeFileSync(
+    CATALOG_CACHE_PATH,
+    JSON.stringify({
+      fetchedAt: new Date().toISOString(),
+      scanned: snapshot.scanned,
+      foundIds: snapshot.foundIds,
+      providers: snapshot.providers,
+    }),
+  );
+}
 
-  for (let id = 1; id <= SALSA_PROVIDER_SCAN_MAX && emptyStreak < SALSA_PROVIDER_EMPTY_STOP; id++) {
-    scanned = id;
-    const page = await fetchSalsaProviderPage(base, id);
-    if (!page.length) {
-      emptyStreak += 1;
-      continue;
-    }
-    emptyStreak = 0;
-    foundIds.push(id);
-    for (const prov of page) {
-      const key = slugify(prov.providerName);
-    const incoming = (prov.games ?? []).map((g) => ({
+function mergeProviderPage(
+  bySlug: Map<string, SalsaProviderJson>,
+  page: SalsaProviderJson[],
+  providerId: number,
+) {
+  for (const prov of page) {
+    const key = slugify(prov.providerName);
+    const incoming = (prov.games ?? []).map((g) => {
+      const rec = g as unknown as Record<string, unknown>;
+      return {
         ...g,
         gameName: String(g.gameName ?? "").trim(),
-        gameLogo: g.gameLogo ?? (g as { GameLogo?: string }).GameLogo,
-        gameLogoUrl: g.gameLogoUrl ?? (g as { GameLogoUrl?: string }).GameLogoUrl,
-      }));
-      const existing = bySlug.get(key);
-      if (!existing) {
-        bySlug.set(key, { providerName: prov.providerName, salsaProviderId: id, games: incoming });
-        continue;
-      }
-      const seen = new Set(existing.games.map((g) => g.gameName));
-      for (const g of incoming) {
-        if (g.gameName && !seen.has(g.gameName)) {
-          existing.games.push(g);
-          seen.add(g.gameName);
-        }
+        gameLogo: pickString(rec, "gameLogo", "GameLogo") ?? g.gameLogo,
+        gameLogoUrl: pickString(rec, "gameLogoUrl", "GameLogoUrl") ?? g.gameLogoUrl,
+      };
+    });
+    const existing = bySlug.get(key);
+    if (!existing) {
+      bySlug.set(key, { providerName: prov.providerName, salsaProviderId: providerId, games: incoming });
+      continue;
+    }
+    const seen = new Set(existing.games.map((g) => g.gameName));
+    for (const g of incoming) {
+      if (g.gameName && !seen.has(g.gameName)) {
+        existing.games.push(g);
+        seen.add(g.gameName);
       }
     }
   }
+}
 
-  return { providers: [...bySlug.values()], scanned, foundIds };
+async function fetchSalsaProviderPage(
+  base: URL,
+  providerId: number,
+): Promise<{ providers: SalsaProviderJson[]; rateLimited?: string }> {
+  const url = new URL(base);
+  url.searchParams.set("provider", String(providerId));
+  try {
+    const { data, status } = await axios.get<{ data?: { providers?: SalsaProviderJson[] }; error?: string }>(
+      url.toString(),
+      {
+        timeout: 120_000,
+        maxContentLength: 80 * 1024 * 1024,
+        maxBodyLength: 80 * 1024 * 1024,
+        validateStatus: (s) => s < 500,
+      },
+    );
+    const limited = salsaRateLimitMessage(data);
+    if (limited) return { providers: [], rateLimited: limited };
+    if (status >= 400) return { providers: [] };
+    return {
+      providers: (data?.data?.providers ?? []).filter((p) => p?.providerName && (p.games?.length ?? 0) > 0),
+    };
+  } catch {
+    return { providers: [] };
+  }
+}
+
+/** A Salsa exige `provider=N` por request. Sem o param a API devolve 400.
+ *  IDs não são contínuos (PG Soft=42, Evolution=126…). Parar nos primeiros 400
+ *  deixa o cassino só com os estúdios da Salsa. A API também trava 24h após um dump. */
+export async function fetchAllSalsaProviders(rawUrl: string): Promise<SalsaCatalogSnapshot> {
+  const base = catalogBaseUrl(rawUrl);
+  const bySlug = new Map<string, SalsaProviderJson>();
+  const foundIds: number[] = [];
+  const maxId = env.SALSA_PROVIDER_SCAN_MAX;
+  let scanned = 0;
+  let rateLimited: string | null = null;
+
+  for (let start = 1; start <= maxId && !rateLimited; start += SCAN_CONCURRENCY) {
+    const ids: number[] = [];
+    for (let id = start; id < start + SCAN_CONCURRENCY && id <= maxId; id++) ids.push(id);
+    const pages = await Promise.all(ids.map(async (id) => ({ id, ...(await fetchSalsaProviderPage(base, id)) })));
+    let batchLimited: string | null = null;
+    for (const page of pages) {
+      scanned = Math.max(scanned, page.id);
+      if (page.rateLimited) batchLimited = page.rateLimited;
+      if (!page.providers.length) continue;
+      foundIds.push(page.id);
+      mergeProviderPage(bySlug, page.providers, page.id);
+    }
+    if (batchLimited) rateLimited = batchLimited;
+  }
+
+  const snapshot: SalsaCatalogSnapshot = {
+    providers: [...bySlug.values()],
+    scanned,
+    foundIds,
+    rateLimited,
+  };
+
+  if (snapshot.providers.length) {
+    const cached = loadCatalogCache();
+    if (rateLimited && cached && cached.providers.length > snapshot.providers.length) {
+      return {
+        ...cached,
+        fromCache: true,
+        rateLimited,
+        scanned: scanned || cached.scanned,
+      };
+    }
+    saveCatalogCache(snapshot);
+    return snapshot;
+  }
+
+  const cached = loadCatalogCache();
+  if (cached) {
+    return {
+      ...cached,
+      fromCache: true,
+      rateLimited: rateLimited ?? cached.rateLimited ?? null,
+      scanned: scanned || cached.scanned,
+    };
+  }
+
+  return snapshot;
 }
 
 export async function getSalsaIntegrationStatus() {
@@ -180,6 +291,11 @@ export async function syncSalsaGamesFromSource(options?: {
   const catalog = await fetchAllSalsaProviders(url);
   const providers = catalog.providers;
   if (!providers.length) {
+    if (catalog.rateLimited) {
+      throw new Error(
+        `A Salsa limita o download do catálogo a 1 vez / 24h (${catalog.rateLimited}). Espere o prazo e rode npm run salsa:sync de novo — o scanner agora varre PG Soft, Pragmatic e os demais IDs.`,
+      );
+    }
     throw new Error("JSON da Salsa não contém providers — confira a URL / PN");
   }
 
@@ -303,6 +419,8 @@ export async function syncSalsaGamesFromSource(options?: {
     providerNames: providers.map((p) => p.providerName),
     logosFromUrl,
     logosFromBase64,
+    fromCache: Boolean(catalog.fromCache),
+    rateLimited: catalog.rateLimited ?? null,
     entitlements,
     published,
   };

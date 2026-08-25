@@ -25,6 +25,8 @@ const envSchema = z.object({
   SALSA_HASH_KEY: z.string().optional(),
   SALSA_GAME_LIST_URL: z.string().optional(),
   SALSA_API_BASE: z.string().default("https://api-test.salsagator.com"),
+  /** Quantos IDs `provider=N` varrer. PG Soft ~42, Pragmatic e outros vêm depois de buracos 400. */
+  SALSA_PROVIDER_SCAN_MAX: z.coerce.number().int().min(1).max(500).default(250),
   /** URL pública que a Salsa chama (túnel/produção). Sem isso, localhost gera Communication error. */
   SALSA_PUBLISHER_URL: z.string().optional(),
   SALSA_DEFAULT_COST_PCT: z.coerce.number().default(6.5),

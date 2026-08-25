@@ -83,6 +83,7 @@ router.get("/media/cover/:slug", async (req, res) => {
     res.set("Content-Type", payload.contentType);
     res.set("Cache-Control", "public, max-age=86400");
     res.set("Cross-Origin-Resource-Policy", "cross-origin");
+    res.set("Access-Control-Allow-Origin", "*");
     res.send(payload.buffer);
     return;
   }
@@ -92,6 +93,8 @@ router.get("/media/cover/:slug", async (req, res) => {
   }
   res.set("Content-Type", "image/svg+xml; charset=utf-8");
   res.set("Cache-Control", "public, max-age=3600");
+  res.set("Cross-Origin-Resource-Policy", "cross-origin");
+  res.set("Access-Control-Allow-Origin", "*");
   res.send("svg" in payload ? payload.svg : "");
 });
 

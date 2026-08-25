@@ -16,6 +16,12 @@ async function main() {
   console.log(`  IDs Salsa: ${(result.providerIds ?? []).join(", ")}`);
   console.log(`  Criados: ${result.created}  Atualizados: ${result.updated}`);
   console.log(`  Logos URL: ${result.logosFromUrl ?? 0}  Logos BASE64: ${result.logosFromBase64 ?? 0}`);
+  if (result.fromCache) {
+    console.log("  Aviso: catálogo veio do cache local — a Salsa bloqueia novo download por 24h.");
+  }
+  if (result.rateLimited) {
+    console.log(`  Rate limit Salsa: ${result.rateLimited}`);
+  }
   if (!(result.logosFromUrl || result.logosFromBase64)) {
     console.log("  Aviso: o JSON desta conta não enviou gameLogo/gameLogoUrl — capas usam fallback até a Salsa preencher esses campos.");
   }
