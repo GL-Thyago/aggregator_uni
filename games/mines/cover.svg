@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14532d"/>
+      <stop offset="100%" stop-color="#052e16"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)"/>
+  <g transform="translate(120,40)">
+    <rect width="56" height="56" rx="8" fill="#166534" stroke="#22c55e"/>
+    <rect x="72" width="56" height="56" rx="8" fill="#14532d" stroke="#15803d"/>
+    <rect x="144" width="56" height="56" rx="8" fill="#166534" stroke="#22c55e"/>
+    <rect y="72" width="56" height="56" rx="8" fill="#14532d" stroke="#15803d"/>
+    <rect x="72" y="72" width="56" height="56" rx="8" fill="#dc2626" stroke="#ef4444"/>
+    <rect x="144" y="72" width="56" height="56" rx="8" fill="#166534" stroke="#22c55e"/>
+  </g>
+  <text x="200" y="210" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="26" font-weight="800">Mines</text>
+</svg>

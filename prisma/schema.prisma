@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GameType {
+  SLOT
+  CRASH
+  TABLE
+  BINGO
+  INSTANT
+  OTHER
+}
+
+enum GameEngine {
+  CONSTRUCT3
+  HTML5
+  IFRAME
+  NODE
+  EXTERNAL
+}
+
+/// Origem da integração do provedor de jogos
+enum ProviderIntegration {
+  NATIVE
+  SALSA
+  DIRECT
+}
+
+enum SalsaTxKind {
+  PLACE_BET
+  AWARD_WINNINGS
+  REFUND_BET
+}
+
+// ─── Consumidores B2B (back_uni_fut, operadores, desenvolvedores) ─────────────
+
+/// Pré-pago: saldo B2B deve ser positivo. Pós-pago: pode ficar negativo até maxCredit.
+enum BillingMode {
+  PREPAID
+  POSTPAID
+}
+
+enum ClientWalletTxType {
+  FUND
+  DEBIT_FEE
+  ADJUST
+  REFUND
+}
+
+model Client {
+  id           String   @id @default(cuid())
+  name         String
+  apiKeyHash   String   @unique @map("api_key_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  /// Taxa B2B cobrada do operador sobre cada aposta (%)
+  marginPct    Decimal  @default(0) @map("margin_pct") @db.Decimal(5, 2)
+  billingMode  BillingMode @default(PREPAID) @map("billing_mode")
+  /// Limite de crédito negativo (pós-pago). Null = sem limite explícito.
+  maxCredit    Decimal? @map("max_credit") @db.Decimal(18, 2)
+  /// URL base do wallet no consumidor (ex: https://back_uni_fut/api/casino/wallet)
+  walletUrl    String?  @map("wallet_url")
+  /// Segredo HMAC para assinar callbacks wallet
+  walletSecret String?  @map("wallet_secret")
+  /// Modo do pool de RTP: GLOBAL (por jogo) ou PER_CLIENT (por operador+jogo)
+  rtpPoolMode  RtpPoolMode @default(GLOBAL) @map("rtp_pool_mode")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  entitlements  ClientEntitlement[]
+  refreshTokens RefreshToken[]
+  gameSessions  GameSession[]
+  playerWallets PlayerWallet[]
+  clientWallet  ClientWallet?
+  walletTxs     ClientWalletTransaction[]
+  rtpLedgers    ClientGameRtpLedger[]
+
+  @@map("clients")
+}
+
+/// Carteira B2B do operador — taxas do agregador são debitadas aqui (invisível ao jogador final)
+model ClientWallet {
+  clientId  String   @id @map("client_id")
+  balance   Decimal  @default(0) @db.Decimal(18, 2)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_wallets")
+}
+
+model ClientWalletTransaction {
+  id            String               @id @default(cuid())
+  clientId      String               @map("client_id")
+  type          ClientWalletTxType
+  amount        Decimal              @db.Decimal(18, 2)
+  balanceBefore Decimal              @map("balance_before") @db.Decimal(18, 2)
+  balanceAfter  Decimal              @map("balance_after") @db.Decimal(18, 2)
+  description   String?
+  referenceId   String?              @map("reference_id")
+  metadata      Json?
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@map("client_wallet_transactions")
+}
+
+/// Controle de acesso por categoria e/ou jogo (mesmo padrão do sportbook: sportId + leagueId)
+/// categoryId + gameId=null → todos os jogos da categoria
+/// categoryId + gameId      → jogo específico
+model ClientEntitlement {
+  id         String   @id @default(cuid())
+  clientId   String   @map("client_id")
+  categoryId Int      @map("category_id")
+  gameId     Int?     @map("game_id")
+  isEnabled  Boolean  @default(true) @map("is_enabled")
+  /// Override do repasse ao provedor (Salsa/upstream) para este cliente+jogo
+  feePct     Decimal? @map("fee_pct") @db.Decimal(5, 2)
+  /// Total % cobrado do operador B2B neste jogo (ex.: 20). Sua margem = chargePct − repasse
+  chargePct  Decimal? @map("charge_pct") @db.Decimal(5, 2)
+  /// Override RTP alvo para este cliente+jogo (null = usa Game.rtp)
+  rtpPct     Decimal? @map("rtp_pct") @db.Decimal(5, 2)
+
+  client   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category GameCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  game     Game?        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, categoryId, gameId])
+  @@index([clientId])
+  @@map("client_entitlements")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  clientId  String   @map("client_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("refresh_tokens")
+}
+
+// ─── Catálogo de jogos ────────────────────────────────────────────────────────
+
+model GameProvider {
+  id             Int                 @id @default(autoincrement())
+  slug           String              @unique
+  name           String
+  isActive       Boolean             @default(true) @map("is_active")
+  integration    ProviderIntegration @default(NATIVE)
+  /// Custo padrão repassado ao provedor (% GGR) — ex.: Salsa Studio 6.5%
+  defaultCostPct Decimal?            @map("default_cost_pct") @db.Decimal(5, 2)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  games Game[]
+
+  @@map("game_providers")
+}
+
+model GameCategory {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  games         Game[]
+  entitlements  ClientEntitlement[]
+
+  @@map("game_categories")
+}
+
+model Game {
+  id           Int        @id @default(autoincrement())
+  slug         String     @unique
+  name         String
+  providerId   Int        @map("provider_id")
+  categoryId   Int        @map("category_id")
+  gameType     GameType   @default(SLOT) @map("game_type")
+  engine       GameEngine @default(CONSTRUCT3)
+  /// Caminho relativo dentro de GAMES_DIR (ex: fortune-tiger)
+  assetPath    String?    @map("asset_path")
+  /// URL externa quando engine=EXTERNAL ou IFRAME
+  externalUrl    String?    @map("external_url")
+  /// Código do jogo no provedor externo (ex.: gameName Salsa)
+  externalGameId String?    @map("external_game_id")
+  thumbnailUrl   String?    @map("thumbnail_url")
+  rtp          Decimal?   @db.Decimal(5, 2)
+  minBet       Decimal?   @map("min_bet") @db.Decimal(12, 2)
+  maxBet           Decimal?   @map("max_bet") @db.Decimal(12, 2)
+  /// Taxa do agregador sobre cada aposta neste jogo (%). Ex: 10 = 10% do valor apostado
+  aggregatorFeePct Decimal    @default(10) @map("aggregator_fee_pct") @db.Decimal(5, 2)
+  isActive         Boolean    @default(true) @map("is_active")
+  isFeatured   Boolean    @default(false) @map("is_featured")
+  sortOrder    Int        @default(0) @map("sort_order")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  provider     GameProvider        @relation(fields: [providerId], references: [id])
+  category     GameCategory        @relation(fields: [categoryId], references: [id])
+  entitlements ClientEntitlement[]
+  sessions     GameSession[]
+  rtpLedger    GameRtpLedger?
+  clientRtpLedgers ClientGameRtpLedger[]
+
+  @@index([categoryId])
+  @@index([providerId])
+  @@index([isActive, isFeatured])
+  @@map("games")
+}
+
+// ─── Sessões de jogo (wallet bridge entre consumidor e jogo) ──────────────────
+
+model GameSession {
+  id             String    @id @default(cuid())
+  clientId       String    @map("client_id")
+  gameId         Int       @map("game_id")
+  /// ID do jogador no sistema consumidor (back_uni_fut)
+  externalUserId String    @map("external_user_id")
+  /// Token opaco usado pelo jogo para chamar a API de spin/balance
+  sessionToken   String    @unique @map("session_token")
+  currency       String    @default("BRL")
+  balance        Decimal   @default(0) @db.Decimal(14, 2)
+  isActive       Boolean   @default(true) @map("is_active")
+  expiresAt      DateTime  @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  spins  GameSpin[]
+  salsaTxs SalsaTransaction[]
+
+  @@index([clientId, externalUserId])
+  @@index([sessionToken])
+  @@map("game_sessions")
+}
+
+model GameSpin {
+  id              String   @id @default(cuid())
+  sessionId       String   @map("session_id")
+  betAmount       Decimal  @map("bet_amount") @db.Decimal(14, 2)
+  winAmount       Decimal  @map("win_amount") @db.Decimal(14, 2)
+  /// Taxa cobrada pelo jogo (revenue share do provedor/agregador)
+  gameFeeAmount   Decimal  @default(0) @map("game_fee_amount") @db.Decimal(14, 2)
+  /// Taxa B2B cobrada do operador (marginPct do client)
+  clientFeeAmount Decimal  @default(0) @map("client_fee_amount") @db.Decimal(14, 2)
+  gameFeePct      Decimal  @default(0) @map("game_fee_pct") @db.Decimal(5, 2)
+  clientFeePct    Decimal  @default(0) @map("client_fee_pct") @db.Decimal(5, 2)
+  balanceBefore   Decimal  @map("balance_before") @db.Decimal(14, 2)
+  balanceAfter    Decimal  @map("balance_after") @db.Decimal(14, 2)
+  externalTxId    String?  @map("external_tx_id")
+  result          Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("game_spins")
+}
+
+/// Idempotência das transações Salsa (PlaceBet / AwardWinnings / RefundBet)
+model SalsaTransaction {
+  id                 String      @id @default(cuid())
+  sessionId          String      @map("session_id")
+  salsaTransactionId String      @map("salsa_transaction_id")
+  referenceNum       String      @map("reference_num")
+  kind               SalsaTxKind
+  amountCents        Int         @map("amount_cents")
+  gameReference      String?     @map("game_reference")
+  extTransactionNum  BigInt      @map("ext_transaction_num")
+  spinId             String?     @map("spin_id")
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([salsaTransactionId, referenceNum, kind])
+  @@index([sessionId])
+  @@map("salsa_transactions")
+}
+
+/// Configuração Salsa no banco (complementa .env — editável pelo admin)
+model SalsaIntegrationConfig {
+  id                     Int      @id @default(1)
+  enabled                Boolean  @default(false)
+  publisherName          String?  @map("publisher_name")
+  hashKey                String?  @map("hash_key")
+  gameListUrl            String?  @map("game_list_url")
+  apiBase                String   @default("https://api-test.salsagator.com") @map("api_base")
+  defaultProviderCostPct Decimal  @default(6.5) @map("default_provider_cost_pct") @db.Decimal(5, 2)
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("salsa_integration_config")
+}
+
+/// Controle global de RTP por jogo — caixa da casa + pool de prêmios
+model GameRtpLedger {
+  gameId       Int      @id @map("game_id")
+  totalWagered Decimal  @default(0) @map("total_wagered") @db.Decimal(18, 2)
+  totalPaidOut Decimal  @default(0) @map("total_paid_out") @db.Decimal(18, 2)
+  /// Cache do fundo de prêmios (apostado × RTP% − pago) — banca retida fica implícita
+  housePool    Decimal  @default(0) @map("house_pool") @db.Decimal(18, 2)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("game_rtp_ledgers")
+}
+
+/// Pool de RTP por operador + jogo (quando Client.rtpPoolMode = PER_CLIENT)
+model ClientGameRtpLedger {
+  clientId     String   @map("client_id")
+  gameId       Int      @map("game_id")
+  totalWagered Decimal  @default(0) @map("total_wagered") @db.Decimal(18, 2)
+  totalPaidOut Decimal  @default(0) @map("total_paid_out") @db.Decimal(18, 2)
+  housePool    Decimal  @default(0) @map("house_pool") @db.Decimal(18, 2)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, gameId])
+  @@index([gameId])
+  @@map("client_game_rtp_ledgers")
+}
+
+// ─── Carteira do jogador no agregador (saldo real para cassino) ───────────────
+
+enum WalletTxType {
+  DEPOSIT
+  WITHDRAW
+  BET
+  WIN
+  GAME_FEE
+  CLIENT_FEE
+  ADJUST
+}
+
+/// GLOBAL = pool de RTP compartilhado por jogo (todos operadores)
+/// PER_CLIENT = pool separado por operador + jogo
+enum RtpPoolMode {
+  GLOBAL
+  PER_CLIENT
+}
+
+model PlayerWallet {
+  id             String   @id @default(cuid())
+  clientId       String   @map("client_id")
+  externalUserId String   @map("external_user_id")
+  currency       String   @default("BRL")
+  balance        Decimal  @default(0) @db.Decimal(14, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  client       Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@unique([clientId, externalUserId, currency])
+  @@index([clientId, externalUserId])
+  @@map("player_wallets")
+}
+
+model WalletTransaction {
+  id             String       @id @default(cuid())
+  walletId       String       @map("wallet_id")
+  type           WalletTxType
+  amount         Decimal      @db.Decimal(14, 2)
+  balanceBefore  Decimal      @map("balance_before") @db.Decimal(14, 2)
+  balanceAfter   Decimal      @map("balance_after") @db.Decimal(14, 2)
+  referenceId    String?      @map("reference_id")
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  wallet PlayerWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([referenceId])
+  @@map("wallet_transactions")
+}

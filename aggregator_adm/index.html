@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aggregator ADM</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="auth-screen" class="auth-screen">
+    <form id="auth-form" class="auth-card">
+      <h1>Aggregator ADM</h1>
+      <p>Painel de operadores, saldos e analytics</p>
+      <label>Admin API Key</label>
+      <input id="admin-key-input" type="password" placeholder="X-Admin-Key" autocomplete="off">
+      <label>URL da API</label>
+      <input id="api-base-input" type="text" value="/admin/v1">
+      <button type="submit">Entrar</button>
+      <p id="auth-error" class="err-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">Aggregator ADM</div>
+      <nav>
+        <button data-view="dashboard" class="nav active">Dashboard</button>
+        <button data-view="clients" class="nav">Clientes</button>
+        <button data-view="revenue" class="nav">Receita / Repasse</button>
+        <button data-view="integrations" class="nav">Integrações</button>
+        <button data-view="rtp" class="nav">RTP</button>
+      </nav>
+      <div class="sidebar-foot">
+        <select id="period-select">
+          <option value="7">Últimos 7 dias</option>
+          <option value="30" selected>Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+        </select>
+        <button id="logout-btn" class="ghost">Sair</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h2 id="view-title">Dashboard</h2>
+        <select id="client-filter" class="client-filter">
+          <option value="">Todos os clientes</option>
+        </select>
+      </header>
+
+      <div id="global-error" class="banner err hidden"></div>
+
+      <!-- Dashboard -->
+      <section id="view-dashboard" class="view">
+        <div class="cards" id="overview-cards"></div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Movimento diário (apostado vs repasse)</h3>
+            <canvas id="chart-timeseries"></canvas>
+          </div>
+          <div class="panel">
+            <h3>Jogos mais jogados</h3>
+            <canvas id="chart-top-games"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Movimento por cliente</h3>
+          <div class="table-wrap" id="client-movement-table"></div>
+        </div>
+      </section>
+
+      <!-- Clientes -->
+      <section id="view-clients" class="view hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Clientes B2B</h3>
+            <button id="btn-new-client">+ Novo cliente</button>
+          </div>
+          <div class="table-wrap" id="clients-table"></div>
+        </div>
+
+        <div id="client-form-panel" class="panel hidden">
+          <h3 id="client-form-title">Novo cliente</h3>
+          <form id="client-form" class="form-grid">
+            <label>Nome<input name="name" required></label>
+            <label>Margem B2B (%)<input name="marginPct" type="number" step="0.1" value="5"></label>
+            <label>Cobrança
+              <select name="billingMode">
+                <option value="PREPAID">Pré-pago</option>
+                <option value="POSTPAID">Pós-pago</option>
+              </select>
+            </label>
+            <label>Limite crédito pós-pago (R$)<input name="maxCredit" type="number" step="0.01" placeholder="Ex: 50000"></label>
+            <label>Saldo inicial (R$)<input name="initialBalance" type="number" step="0.01" value="0"></label>
+            <label>Pool RTP
+              <select name="rtpPoolMode">
+                <option value="GLOBAL">Global</option>
+                <option value="PER_CLIENT">Por cliente</option>
+              </select>
+            </label>
+            <label>Wallet URL<input name="walletUrl" type="url" placeholder="https://..."></label>
+            <label>Wallet Secret<input name="walletSecret" type="text" placeholder="mín. 8 chars"></label>
+            <div class="full">
+              <h4>Acessos (categorias / jogos)</h4>
+              <div id="entitlements-builder"></div>
+            </div>
+            <div class="full actions">
+              <button type="submit">Salvar cliente</button>
+              <button type="button" id="cancel-client-form" class="ghost">Cancelar</button>
+            </div>
+          </form>
+          <div id="new-api-key-box" class="api-key-box hidden"></div>
+        </div>
+
+        <div id="client-detail-panel" class="panel hidden">
+          <div class="panel-head">
+            <h3 id="client-detail-name">Cliente</h3>
+            <button id="btn-edit-client" class="ghost">Editar config</button>
+          </div>
+          <div class="cards" id="client-wallet-cards"></div>
+          <form id="wallet-fund-form" class="inline-form">
+            <input name="amount" type="number" step="0.01" min="0.01" placeholder="Valor recarga" required>
+            <input name="description" type="text" placeholder="Descrição (opcional)">
+            <button type="submit">Recarregar saldo</button>
+          </form>
+          <h4>Comissões por jogo (repasse Salsa + cobrança total ao operador)</h4>
+          <p class="hint">Repasse = pago à Salsa/upstream · Cobrança total = debitado do operador (ex. 20%) · Sua margem = cobrança − repasse</p>
+          <div class="table-wrap" id="client-game-rates-table"></div>
+          <button id="btn-save-rates">Salvar taxas</button>
+          <h4>Últimas transações B2B</h4>
+          <div class="table-wrap" id="client-wallet-txs"></div>
+        </div>
+      </section>
+
+      <!-- Receita -->
+      <section id="view-revenue" class="view hidden">
+        <div class="panel">
+          <h3>Quanto você ganha vs quanto repassa (por jogo)</h3>
+          <p class="hint">Ganho = taxa do jogo + margem B2B · Repasse = prêmios pagos aos jogadores</p>
+          <div class="table-wrap" id="revenue-table"></div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Ganho do agregador</h3>
+            <canvas id="chart-revenue-earn"></canvas>
+          </div>
+          <div class="panel">
+            <h3>Repasse (prêmios)</h3>
+            <canvas id="chart-revenue-payout"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Integrações -->
+      <section id="view-integrations" class="view hidden">
+        <div class="panel">
+          <h3>Salsa Technology</h3>
+          <p class="hint">A URL do Publisher cadastrada na Salsa tem que ser pública (API do agregador). localhost gera "Communication error" no jogo. Use um túnel e SALSA_PUBLISHER_URL.</p>
+          <div id="salsa-status" class="cards"></div>
+          <div class="inline-form">
+            <button id="btn-salsa-sync">Importar jogos do JSON Salsa</button>
+            <button id="btn-salsa-publish" class="ghost">Publicar no cassino</button>
+            <label class="inline-check"><input type="checkbox" id="salsa-activate-on-sync"> Ativar e publicar após sync</label>
+            <input id="salsa-default-cost" type="number" step="0.1" placeholder="Repasse padrão %" style="width:120px">
+          </div>
+          <form id="salsa-config-form" class="form-grid" style="margin-top:1rem">
+            <label><input type="checkbox" name="enabled"> Salsa ativa</label>
+            <label>PN (Publisher Name)<input name="publisherName" placeholder="SALSA_PN"></label>
+            <label>Hash Key<input name="hashKey" type="password" placeholder="deixe vazio para manter"></label>
+            <label>URL JSON jogos<input name="gameListUrl" type="url" placeholder="SALSA_GAME_LIST_URL"></label>
+            <label>API Base<input name="apiBase" placeholder="https://api-test.salsagator.com"></label>
+            <label>Repasse padrão %<input name="defaultProviderCostPct" type="number" step="0.1"></label>
+            <div class="full actions"><button type="submit">Salvar config Salsa</button></div>
+          </form>
+          <pre id="salsa-config-pre" class="config-pre"></pre>
+        </div>
+        <div class="panel">
+          <h3>Jogos Salsa / terceiros importados</h3>
+          <p class="hint">Ex.: Tigrinho repasse 5% · Banca X cobrada 20% (15% sua margem) — configure repasse aqui e cobrança por cliente na aba Clientes.</p>
+          <div class="inline-form">
+            <input id="salsa-games-search" type="search" placeholder="Buscar jogo...">
+            <button id="btn-salsa-games-refresh" class="ghost">Atualizar</button>
+            <label>Repasse em lote %<input id="salsa-bulk-cost" type="number" step="0.1" style="width:80px"></label>
+            <button id="btn-salsa-bulk-cost">Aplicar a todos Salsa</button>
+          </div>
+          <div class="table-wrap" id="salsa-games-table"></div>
+        </div>
+        <div class="panel">
+          <h3>Provedores — ligue/desligue PG, Salsa, etc.</h3>
+          <p class="hint">Desativar um provedor oculta todos os jogos dele para os operadores. Use cascade para desativar os jogos também.</p>
+          <div class="table-wrap" id="providers-table"></div>
+        </div>
+      </section>
+
+      <!-- RTP legado -->
+      <section id="view-rtp" class="view hidden">
+        <div class="panel">
+          <h3>RTP por jogo</h3>
+          <div class="table-wrap" id="rtp-table"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

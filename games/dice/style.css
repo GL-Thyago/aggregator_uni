@@ -1,0 +1,19 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #12121a; color: #eee; min-height: 100vh; }
+.app { max-width: 400px; margin: 0 auto; padding: 16px; }
+header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+.balance { color: #888; font-size: 0.9rem; }
+.balance strong { color: #60a5fa; }
+.result-box { text-align: center; padding: 40px 0; }
+.roll { font-size: 4rem; font-weight: 800; color: #60a5fa; }
+.roll.win { color: #4ade80; }
+.roll.lose { color: #f87171; }
+.hint { color: #666; margin-top: 8px; }
+.controls { display: flex; flex-direction: column; gap: 14px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #888; }
+input { padding: 12px; border-radius: 10px; border: 1px solid #333; background: #1e1e28; color: #fff; font-size: 1.1rem; }
+.toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.toggle button { padding: 12px; border-radius: 10px; border: 1px solid #444; background: #222; color: #aaa; cursor: pointer; font-weight: 600; }
+.toggle button.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.play { padding: 16px; border: none; border-radius: 12px; background: #3b82f6; color: #fff; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+.message { text-align: center; color: #aaa; min-height: 1.2em; }

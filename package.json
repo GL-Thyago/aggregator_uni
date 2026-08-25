@@ -1,0 +1,53 @@
+{
+  "name": "casino_aggregator",
+  "version": "1.0.0",
+  "description": "B2B Casino aggregator — gerencia jogos, acessos de desenvolvedores e integração com back_uni_fut",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "salsa:sync": "tsx scripts/salsa-sync.ts",
+    "games:setup": "node scripts/setup-games.mjs",
+    "tv:assets": "python scripts/download-bundletvm.py && python scripts/export-unique-symbols.py",
+    "db:studio": "prisma studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:prod": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml --env-file .env.production down",
+    "docker:prod:logs": "docker compose -f docker-compose.prod.yml logs -f app",
+    "docker:prod:sync": "docker compose -f docker-compose.prod.yml --env-file .env.production exec app npx tsx scripts/salsa-sync.ts"
+  },
+  "keywords": ["casino", "aggregator", "b2b", "games"],
+  "license": "ISC",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "axios": "^1.18.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ioredis": "^5.9.3",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.19.0",
+    "prisma": "^7.9.0",
+    "tsx": "^4.23.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.1.1",
+    "@types/pg": "^8.16.0",
+    "typescript": "^7.0.2"
+  }
+}

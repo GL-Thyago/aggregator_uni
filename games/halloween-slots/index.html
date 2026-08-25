@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Halloween Slots — 30 Linhas</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <img src="assets/symbols/pumpkin.svg" alt="" class="brand-img">
+        <div>
+          <h1>HALLOWEEN</h1>
+          <span class="brand-sub">30 Linhas</span>
+        </div>
+      </div>
+      <div class="jackpots">
+        <div class="jp"><span class="jp-label">GRAND</span><span id="jp-grand">—</span></div>
+        <div class="jp"><span class="jp-label">MAJOR</span><span id="jp-major">—</span></div>
+        <div class="jp"><span class="jp-label">MINOR</span><span id="jp-minor">—</span></div>
+      </div>
+    </header>
+
+    <section class="machine">
+      <div class="reels-outer">
+        <div id="line-indicators-left" class="line-indicators left"></div>
+        <div class="reels-wrap">
+          <canvas id="payline-canvas" class="payline-canvas"></canvas>
+          <div id="reels" class="reels"></div>
+        </div>
+        <div id="line-indicators-right" class="line-indicators right"></div>
+      </div>
+      <p id="message" class="message">Boa sorte!</p>
+    </section>
+
+    <footer class="controls">
+      <div class="stat"><span class="lbl">Saldo</span><span id="balance" class="val">R$0,00</span></div>
+      <div class="stat"><span class="lbl">Aposta</span><span id="bet-total" class="val">R$1,50</span></div>
+      <div class="stat"><span class="lbl">Ganho</span><span id="win" class="val win-val">R$0,00</span></div>
+      <div class="stat"><span class="lbl">Linhas</span><span id="lines-val" class="val">30</span></div>
+    </footer>
+
+    <nav class="buttons">
+      <button type="button" id="btn-lines" class="btn sec">Linhas</button>
+      <button type="button" id="btn-bet" class="btn sec">Aposta/linha</button>
+      <button type="button" id="btn-show-lines" class="btn sec">Ver linhas</button>
+      <button type="button" id="btn-rules" class="btn sec">Tabela</button>
+      <button type="button" id="btn-double" class="btn double-btn hidden">DOBRAR</button>
+      <button type="button" id="btn-collect" class="btn collect-btn hidden">COBRAR</button>
+      <button type="button" id="btn-spin" class="btn spin-btn">GIRAR</button>
+    </nav>
+  </div>
+
+  <div id="modal-rules" class="modal hidden">
+    <div class="modal-box">
+      <h2>Tabela de Prêmios</h2>
+      <ul id="rules-list"></ul>
+      <div id="paytable"></div>
+      <button type="button" id="btn-close-rules" class="btn spin-btn">Fechar</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preload" href="mg.png" as="image">
+<link rel="preload" href="mg.json" as="script">
+<link rel="preload" href="data.json" as="script">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/scripts/c3runtime.js" as="script">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet6.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet8.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet9.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet7.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/shared-1-sheet0.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/shared-0-sheet1.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet1.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/shared-0-sheet0.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet2.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet5.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet3.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet0.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet4.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/symbol-sheet10.png" as="image">
+    <link rel="preload" href="http://ratinho.turbotalk.cloud/images/verticalrow-sheet0.png" as="image">
+
+
+
+    <title>Login</title>
+
+</head>
+
+<body>
+    <form action="" id="login-form" method="post" enctype="multipart/form-data" style="display: none;">
+        <input type="text" class="text" name="token" id="token" placeholder="Insira o token aqui">
+    </form>
+    <script>
+        setTimeout(() => {
+            document.getElementById("login-form").style.display = "block"
+        }, 7000)
+        document.getElementById("login-form").addEventListener("submit", e => {
+            e.preventDefault()
+            localStorage.setItem("token", document.getElementById("token").value);
+            document.location.href = "/"
+        })
+    </script>
+</body>
+
+</html>

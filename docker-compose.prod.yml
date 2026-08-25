@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: rggames_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: casino_aggregator
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d casino_aggregator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rggames
+
+  redis:
+    image: redis:7
+    container_name: rggames_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - rggames
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rggames_aggregator
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3010"
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/casino_aggregator
+      REDIS_URL: redis://redis:6379
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://rggames.site}
+      SALSA_PUBLISHER_URL: ${SALSA_PUBLISHER_URL:-https://rggames.site/api/v1/salsa/publisher}
+      GAMES_DIR: ./games
+      RUN_SEED: ${RUN_SEED:-false}
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./games:/app/games
+      - covers_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3010/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - rggames
+
+volumes:
+  postgres_data:
+  redis_data:
+  covers_data:
+
+networks:
+  rggames:
+    name: rggames

@@ -1,0 +1,55 @@
+[28-Nov-2023 21:00:23 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[28-Nov-2023 21:10:18 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[28-Nov-2023 21:10:27 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[28-Nov-2023 21:10:54 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[29-Nov-2023 08:57:09 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[29-Nov-2023 08:58:32 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[29-Nov-2023 20:39:50 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[29-Nov-2023 20:40:11 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[30-Nov-2023 21:00:17 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[30-Nov-2023 21:09:44 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20
+[30-Nov-2023 21:24:19 America/Sao_Paulo] PHP Fatal error:  Uncaught TypeError: Argument 1 passed to E() must be of the type string, null given, called in /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php on line 9 and defined in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php:20
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-tiger/api/index.php(9): E(NULL)
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-tiger/api/inc/functions.inc.php on line 20

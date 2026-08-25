@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Luck — Duende da Sorte</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <img src="assets/symbols/leprechaun.svg" alt="" class="brand-img">
+        <div>
+          <h1>LUCK</h1>
+          <span class="brand-sub">Duende da Sorte</span>
+        </div>
+      </div>
+      <div class="jackpots">
+        <div class="jp"><span class="jp-label">GRAND</span><span id="jp-grand">—</span></div>
+        <div class="jp"><span class="jp-label">MAJOR</span><span id="jp-major">—</span></div>
+        <div class="jp"><span class="jp-label">MINOR</span><span id="jp-minor">—</span></div>
+      </div>
+    </header>
+
+    <section class="machine">
+      <div id="bonus-banner" class="bonus-banner hidden">Rodadas da Sorte ×2!</div>
+      <div class="reels-outer">
+        <div id="line-indicators-left" class="line-indicators left"></div>
+        <div class="reels-wrap">
+          <canvas id="payline-canvas" class="payline-canvas"></canvas>
+          <div id="reels" class="reels"></div>
+        </div>
+        <div id="line-indicators-right" class="line-indicators right"></div>
+      </div>
+      <p id="message" class="message">Boa sorte!</p>
+    </section>
+
+    <footer class="controls">
+      <div class="stat"><span class="lbl">Saldo</span><span id="balance" class="val">R$0,00</span></div>
+      <div class="stat"><span class="lbl">Aposta</span><span id="bet-total" class="val">R$1,00</span></div>
+      <div class="stat"><span class="lbl">Ganho</span><span id="win" class="val win-val">R$0,00</span></div>
+      <div class="stat"><span class="lbl">Grátis</span><span id="free-spins" class="val">0</span></div>
+    </footer>
+
+    <nav class="buttons">
+      <button type="button" id="btn-lines" class="btn sec">Linhas <strong id="lines-val">25</strong></button>
+      <button type="button" id="btn-bet" class="btn sec">Linha <strong id="bet-line-val">5</strong></button>
+      <button type="button" id="btn-show-lines" class="btn sec">Ver linhas</button>
+      <button type="button" id="btn-rules" class="btn sec">Regras</button>
+      <button type="button" id="btn-spin" class="btn spin-btn">GIRAR</button>
+    </nav>
+  </div>
+
+  <div id="modal-rules" class="modal hidden">
+    <div class="modal-box">
+      <h2>Regras — Luck</h2>
+      <ul id="rules-list"></ul>
+      <div id="paytable"></div>
+      <button type="button" id="btn-close-rules" class="btn spin-btn">Fechar</button>
+    </div>
+  </div>
+
+  <div id="modal-bonus" class="modal hidden">
+    <div class="modal-box bonus-box">
+      <h2>Bônus Caldeirão</h2>
+      <p class="bonus-hint">Escolha um caldeirão — o melhor multiplica seu prêmio!</p>
+      <div id="cauldron-grid" class="cauldron-grid"></div>
+      <p id="bonus-result" class="bonus-result hidden"></p>
+      <button type="button" id="btn-close-bonus" class="btn spin-btn hidden">Continuar</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

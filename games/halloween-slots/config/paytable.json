@@ -1,0 +1,39 @@
+{
+  "game": "halloween-slots",
+  "title": "Halloween Slots 30 Linhas",
+  "grid": { "cols": 5, "rows": 3 },
+  "lines": {
+    "max": 30,
+    "presets": [1, 5, 10, 15, 20, 25, 30],
+    "minPerLine": 5,
+    "maxPerLine": 40,
+    "minTotal": 150,
+    "maxTotal": 1200
+  },
+  "betUnit": "centavos",
+  "payoutScale": {
+    "fullScaleMinBetPerLine": 10,
+    "lowScaleFactor": 0.5
+  },
+  "formula": "prêmio = aposta_por_linha × multiplicador × escala",
+  "jackpots": {
+    "fullScale": { "grand": 3000, "major": 1500, "minor": 750 },
+    "lowScale": { "grand": 1500, "major": 750, "minor": 375 }
+  },
+  "double": {
+    "enabled": true,
+    "winChancePct": 50
+  },
+  "symbols": [
+    { "id": "witch", "name": "Bruxa", "win_3": 200, "win_4": 1500, "win_5": 5000 },
+    { "id": "pumpkin", "name": "Abóbora", "win_3": 80, "win_4": 500, "win_5": 3000 },
+    { "id": "ghost", "name": "Fantasma", "win_3": 50, "win_4": 350, "win_5": 2000 },
+    { "id": "bat", "name": "Morcego", "win_3": 35, "win_4": 250, "win_5": 1500 },
+    { "id": "skull", "name": "Caveira", "win_3": 25, "win_4": 180, "win_5": 1200 },
+    { "id": "spider", "name": "Aranha", "win_3": 18, "win_4": 120, "win_5": 900 },
+    { "id": "black_cat", "name": "Gato Preto", "win_3": 12, "win_4": 80, "win_5": 600 },
+    { "id": "full_moon", "name": "Lua Cheia", "win_3": 8, "win_4": 50, "win_5": 400 },
+    { "id": "candle", "name": "Vela", "win_3": 5, "win_4": 30, "win_5": 250 },
+    { "id": "candy", "name": "Doce", "win_3": 3, "win_4": 15, "win_5": 150 }
+  ]
+}

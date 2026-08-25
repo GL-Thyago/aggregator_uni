@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="cauld" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#37474f"/><stop offset="100%" stop-color="#1a1a1a"/></linearGradient>
+    <radialGradient id="brew" cx="50%" cy="30%"><stop offset="0%" stop-color="#7b1fa2"/><stop offset="100%" stop-color="#4a148c"/></radialGradient>
+  </defs>
+  <ellipse cx="64" cy="112" rx="40" ry="8" fill="#000" opacity="0.25"/>
+  <path d="M24 56 L20 100 Q64 118 108 100 L104 56 Z" fill="url(#cauld)" stroke="#263238" stroke-width="2"/>
+  <ellipse cx="64" cy="56" rx="40" ry="12" fill="#455a64"/>
+  <ellipse cx="64" cy="52" rx="32" ry="10" fill="url(#brew)"/>
+  <path d="M48 40 Q52 24 56 36" stroke="#69f0ae" stroke-width="3" fill="none" opacity="0.8"/>
+  <path d="M64 36 Q68 16 72 32" stroke="#69f0ae" stroke-width="3" fill="none" opacity="0.9"/>
+  <path d="M76 42 Q80 28 84 38" stroke="#69f0ae" stroke-width="3" fill="none" opacity="0.7"/>
+  <circle cx="56" cy="30" r="3" fill="#b388ff" opacity="0.8"/>
+  <circle cx="72" cy="24" r="2" fill="#ea80fc" opacity="0.8"/>
+</svg>

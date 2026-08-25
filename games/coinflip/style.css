@@ -1,0 +1,25 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #0d1117; color: #eee; min-height: 100vh; }
+.app { max-width: 400px; margin: 0 auto; padding: 16px; text-align: center; }
+header { display: flex; justify-content: space-between; margin-bottom: 32px; text-align: left; }
+.balance { color: #888; font-size: 0.9rem; }
+.balance strong { color: #fbbf24; }
+.coin {
+  width: 120px; height: 120px; margin: 0 auto 32px;
+  border-radius: 50%; background: linear-gradient(145deg, #fbbf24, #d97706);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem; font-weight: 800; color: #1a1a1a;
+  box-shadow: 0 8px 32px rgba(251, 191, 36, 0.3);
+  transition: transform 0.4s;
+}
+.coin.flip { transform: rotateY(720deg); }
+.coin.win { box-shadow: 0 0 40px rgba(74, 222, 128, 0.6); }
+.coin.lose { box-shadow: 0 0 40px rgba(248, 113, 113, 0.5); }
+.controls { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #888; }
+input { padding: 12px; border-radius: 10px; border: 1px solid #333; background: #161b22; color: #fff; font-size: 1.1rem; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.choice { padding: 14px; border-radius: 10px; border: 2px solid #444; background: #222; color: #aaa; cursor: pointer; font-weight: 700; }
+.choice.active { border-color: #fbbf24; color: #fbbf24; background: #2a2008; }
+.play { padding: 16px; border: none; border-radius: 12px; background: #fbbf24; color: #000; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+.message { text-align: center; color: #aaa; }

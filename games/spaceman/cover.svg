@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)"/>
+  <circle cx="320" cy="50" r="60" fill="#a855f7" opacity="0.2"/>
+  <circle cx="80" cy="180" r="40" fill="#fff" opacity="0.08"/>
+  <circle cx="200" cy="100" r="22" fill="#c084fc"/>
+  <circle cx="212" cy="94" r="6" fill="#fff"/>
+  <text x="200" y="200" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="24" font-weight="800">Spaceman</text>
+</svg>

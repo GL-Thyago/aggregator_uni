@@ -1,0 +1,88 @@
+[27-Nov-2023 17:09:06 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 86
+[27-Nov-2023 17:09:58 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 86
+[27-Nov-2023 17:09:58 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Cannot use string offset as an array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php:123
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-mouse-test/api/index.php(11): require()
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 123
+[27-Nov-2023 17:10:51 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:10:51 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Cannot use string offset as an array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php:124
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-mouse-test/api/index.php(11): require()
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 124
+[27-Nov-2023 17:11:15 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:11:15 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Cannot use string offset as an array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php:124
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-mouse-test/api/index.php(11): require()
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 124
+[27-Nov-2023 17:11:32 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:11:32 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Cannot use string offset as an array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php:124
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-mouse-test/api/index.php(11): require()
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 124
+[27-Nov-2023 17:11:51 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:11:51 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Cannot use string offset as an array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php:124
+Stack trace:
+#0 /home/luckbets/public_html/public/games_/fortune-mouse-test/api/index.php(11): require()
+#1 {main}
+  thrown in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 124
+[27-Nov-2023 17:12:29 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:13:02 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:13:08 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:13:13 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:15:02 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:15:14 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:16:25 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:16:25 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 35
+[27-Nov-2023 17:16:33 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:16:33 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 35
+[27-Nov-2023 17:16:58 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:16:58 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 35
+[27-Nov-2023 17:18:00 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:18:05 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:18:17 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 87
+[27-Nov-2023 17:19:28 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:19:28 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:19:39 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:19:39 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:20:15 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:20:15 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:20:25 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:20:25 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:21:05 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:21:05 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:21:05 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:21:52 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:21:52 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:21:52 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:22:03 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:22:03 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:22:03 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:22:03 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:22:03 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:22:29 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:22:29 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:22:29 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:22:29 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:22:29 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:22:37 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 90
+[27-Nov-2023 17:22:37 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:22:37 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:23:03 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:23:03 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:23:03 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:23:03 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:23:03 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:27:27 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:27:27 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:27:27 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:27:27 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:27:27 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:27:33 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:27:33 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37
+[27-Nov-2023 17:27:33 America/Sao_Paulo] PHP Warning:  shuffle() expects parameter 1 to be array, null given in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 91
+[27-Nov-2023 17:27:33 America/Sao_Paulo] PHP Warning:  array_rand(): Second argument has to be between 1 and the number of elements in the array in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 36
+[27-Nov-2023 17:27:33 America/Sao_Paulo] PHP Warning:  Invalid argument supplied for foreach() in /home/luckbets/public_html/public/games_/fortune-mouse-test/api/endpoints/spin.php on line 37

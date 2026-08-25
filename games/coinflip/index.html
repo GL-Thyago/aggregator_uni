@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Coin Flip</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header><h1>🪙 Coin Flip</h1><div class="balance">Saldo: <strong id="balance">—</strong></div></header>
+    <div id="coin" class="coin">?</div>
+    <div class="controls">
+      <label>Aposta <input type="number" id="bet" value="10" min="1"></label>
+      <div class="choices">
+        <button type="button" id="btn-heads" class="choice active">CARA</button>
+        <button type="button" id="btn-tails" class="choice">COROA</button>
+      </div>
+      <button type="button" id="btn-play" class="play">JOGAR</button>
+      <div id="message" class="message"></div>
+    </div>
+  </div>
+  <script src="../_shared/instant-client.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

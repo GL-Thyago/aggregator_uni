@@ -1,0 +1,52 @@
+{
+  "game": "luck",
+  "title": "Luck — Duende da Sorte",
+  "grid": { "cols": 5, "rows": 3 },
+  "lines": {
+    "max": 25,
+    "presets": [1, 5, 9, 15, 25],
+    "minPerLine": 5,
+    "maxPerLine": 50,
+    "minTotal": 100,
+    "maxTotal": 1000
+  },
+  "betUnit": "centavos",
+  "payoutScale": {
+    "fullScaleMinBetPerLine": 10,
+    "lowScaleFactor": 0.5
+  },
+  "formula": "prêmio = aposta_por_linha × multiplicador × escala × bônus",
+  "wild": {
+    "id": "leprechaun",
+    "name": "Duende (Wild)",
+    "substitutes": true
+  },
+  "scatter": {
+    "id": "pot_gold",
+    "name": "Pote de Ouro (Scatter)",
+    "freeSpins": { "3": 8, "4": 12, "5": 20 },
+    "bonusMultiplier": 2,
+    "cauldronTrigger": 3,
+    "cauldronBaseMult": { "3": 2, "4": 3, "5": 5 }
+  },
+  "cauldronBonus": {
+    "count": 5,
+    "wrongMultipliers": [1, 1.5, 2, 2.5],
+    "bestMultipliers": [5, 8, 10]
+  },
+  "jackpots": {
+    "fullScale": { "grand": 2500, "major": 1200, "minor": 600 },
+    "lowScale": { "grand": 1250, "major": 600, "minor": 300 }
+  },
+  "symbols": [
+    { "id": "leprechaun", "name": "Duende", "type": "wild", "win_3": 100, "win_4": 800, "win_5": 5000 },
+    { "id": "rainbow", "name": "Arco-íris", "type": "pay", "win_3": 60, "win_4": 400, "win_5": 2500 },
+    { "id": "horseshoe", "name": "Ferradura", "type": "pay", "win_3": 40, "win_4": 250, "win_5": 1500 },
+    { "id": "harp", "name": "Harpa", "type": "pay", "win_3": 25, "win_4": 150, "win_5": 1000 },
+    { "id": "clover", "name": "Trevo 4 folhas", "type": "pay", "win_3": 15, "win_4": 100, "win_5": 750 },
+    { "id": "coin", "name": "Moeda de ouro", "type": "pay", "win_3": 10, "win_4": 60, "win_5": 500 },
+    { "id": "mushroom", "name": "Cogumelo", "type": "pay", "win_3": 8, "win_4": 40, "win_5": 300 },
+    { "id": "mug", "name": "Caneca", "type": "pay", "win_3": 5, "win_4": 25, "win_5": 200 },
+    { "id": "pot_gold", "name": "Pote de Ouro", "type": "scatter", "win_3": 0, "win_4": 0, "win_5": 0 }
+  ]
+}

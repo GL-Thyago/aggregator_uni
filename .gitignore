@@ -1,0 +1,21 @@
+node_modules/
+dist/
+generated/
+.env
+*.log
+.DS_Store
+data/covers/
+tools/cloudflared.exe
+
+# jogos locais
+# Arquivos extraídos do APK / bundles grandes
+extracted/
+
+# ZIPs grandes
+*.zip
+
+# Unity bundles
+*.unity3d
+
+# Bibliotecas nativas grandes
+*.so

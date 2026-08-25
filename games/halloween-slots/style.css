@@ -1,0 +1,196 @@
+:root {
+  --bg: #0d0618;
+  --panel: #2d1b4e;
+  --orange: #ff9800;
+  --orange-dark: #e65100;
+  --purple: #9c27b0;
+  --text: #fff8e1;
+  --muted: #bcaaa4;
+  --win: #76ff03;
+  --lose: #ff5252;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse at 50% -10%, #4a148c 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, #1a0a2e, var(--bg));
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 10px 10px 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.top { display: flex; justify-content: space-between; align-items: center; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-img { width: 46px; height: 46px; filter: drop-shadow(0 0 8px var(--orange)); }
+.brand h1 { font-size: 1.5rem; color: var(--orange); letter-spacing: 0.15em; line-height: 1; }
+.brand-sub { font-size: 0.68rem; color: var(--muted); display: block; }
+
+.jackpots { text-align: right; }
+.jp { font-size: 0.7rem; color: var(--orange); font-weight: 600; }
+.jp-label { color: var(--muted); margin-right: 6px; font-weight: 400; }
+
+.machine {
+  flex: 1;
+  background: linear-gradient(180deg, #3d2066, var(--panel) 50%, #1a0a2e);
+  border: 3px solid var(--orange-dark);
+  border-radius: 18px;
+  padding: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,152,0,0.15);
+}
+
+.reels-outer { display: flex; gap: 4px; align-items: stretch; }
+
+.line-indicators {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 20px;
+  flex-shrink: 0;
+  padding: 4px 0;
+}
+
+.line-dot {
+  width: 16px;
+  height: 12px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+
+.line-dot.active { color: var(--orange); background: rgba(255,152,0,0.12); }
+.line-dot.winning { color: #fff; background: var(--purple); animation: blink 0.4s infinite alternate; }
+
+@keyframes blink {
+  from { box-shadow: 0 0 4px var(--purple); }
+  to { box-shadow: 0 0 10px var(--orange); }
+}
+
+.reels-wrap {
+  flex: 1;
+  background: #0a0612;
+  border-radius: 12px;
+  padding: 6px;
+  border: 2px solid #4a148c;
+  position: relative;
+}
+
+.payline-canvas {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.reels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  position: relative;
+  z-index: 1;
+}
+
+.cell {
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, #3d2066, #1a0a2e);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,152,0,0.2);
+  position: relative;
+}
+
+.cell img { width: 82%; height: 82%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.cell .cell-num { position: absolute; top: 2px; left: 3px; font-size: 0.42rem; color: rgba(255,255,255,0.15); }
+.cell.win { box-shadow: 0 0 16px var(--orange); border-color: var(--orange); animation: winFlash 0.5s infinite alternate; z-index: 3; }
+.cell.spinning img { animation: blurSpin 0.08s linear infinite; filter: blur(2px); }
+
+@keyframes winFlash { from { transform: scale(1); } to { transform: scale(1.05); } }
+@keyframes blurSpin { 0%,100% { opacity: 0.5; } 50% { opacity: 0.3; } }
+
+.message { text-align: center; margin-top: 10px; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
+.message.win { color: var(--win); font-weight: 700; }
+.message.lose { color: var(--lose); }
+
+.controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stat { background: rgba(0,0,0,0.35); border-radius: 10px; padding: 8px 4px; text-align: center; border: 1px solid rgba(255,152,0,0.1); }
+.stat .lbl { display: block; font-size: 0.58rem; color: var(--muted); text-transform: uppercase; }
+.stat .val { font-size: 0.82rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.win-val { color: var(--orange); }
+
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 4px;
+  font-size: 0.68rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.spin-btn {
+  grid-column: span 2;
+  background: linear-gradient(180deg, var(--orange), var(--orange-dark));
+  color: #1a0a2e;
+  font-size: 1rem;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #bf360c;
+}
+
+.double-btn {
+  grid-column: span 2;
+  background: linear-gradient(180deg, #7b1fa2, #4a148c);
+  color: #fff;
+  font-weight: 800;
+}
+
+.collect-btn {
+  background: linear-gradient(180deg, #455a64, #263238);
+  color: #fff;
+}
+
+.spin-btn:active:not(:disabled), .double-btn:active:not(:disabled) { transform: translateY(2px); }
+
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 200; }
+.modal.hidden { display: none; }
+.modal-box { background: var(--panel); border: 2px solid var(--orange-dark); border-radius: 16px; padding: 20px; max-width: 420px; max-height: 85vh; overflow-y: auto; width: 100%; }
+.modal-box h2 { color: var(--orange); margin-bottom: 12px; }
+.modal-box ul { margin: 0 0 14px 18px; font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+#paytable table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+#paytable th, #paytable td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+#paytable img { width: 26px; height: 26px; vertical-align: middle; margin-right: 4px; }
+.hidden { display: none !important; }
+
+@media (max-width: 420px) {
+  .buttons { grid-template-columns: repeat(3, 1fr); }
+  .spin-btn { grid-column: span 3; }
+  .double-btn { grid-column: span 2; }
+}

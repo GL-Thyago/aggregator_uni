@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mines</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="mines-root">
+    <header class="top-bar">
+      <div class="brand">💣 Mines</div>
+      <div class="balance-wrap">
+        <span class="balance-label">Saldo</span>
+        <span class="balance-value" id="balance">—</span>
+      </div>
+    </header>
+
+    <main class="game-wrap">
+      <div class="stats-row">
+        <div class="stat-box">
+          <span class="stat-label">Multiplicador</span>
+          <span class="stat-value mult" id="mult-display">1.00x</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Próximo</span>
+          <span class="stat-value" id="next-mult">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Gemas restantes</span>
+          <span class="stat-value" id="gems-left">—</span>
+        </div>
+      </div>
+
+      <div class="grid" id="grid"></div>
+
+      <div class="controls">
+        <div class="control-row">
+          <label>Aposta</label>
+          <div class="amount-row">
+            <button type="button" class="amt-btn" id="bet-minus">−</button>
+            <input type="number" id="bet" value="10" min="1" step="0.01">
+            <button type="button" class="amt-btn" id="bet-plus">+</button>
+          </div>
+        </div>
+
+        <div class="control-row">
+          <label>Minas</label>
+          <div class="mines-presets" id="mines-presets"></div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn btn-start" id="btn-start">Apostar</button>
+          <button type="button" class="btn btn-cashout" id="btn-cashout" disabled>Sacar</button>
+        </div>
+      </div>
+
+      <p class="message" id="message"></p>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="../_shared/instant-client.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

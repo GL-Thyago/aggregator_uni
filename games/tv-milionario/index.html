@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TV Milionário</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="viewport">
+    <div id="cabinet" class="cabinet">
+      <header class="hdr">
+        <div class="hdr-title">
+          <img src="assets/symbols/clapper.svg" alt="" class="logo">
+          <div>
+            <h1>TV MILIONÁRIO</h1>
+            <span class="sub">25 Linhas</span>
+          </div>
+        </div>
+        <div class="hdr-stats">
+          <div class="stat-mini"><span>Min</span><strong id="min-bet">125</strong></div>
+          <div class="stat-mini"><span>Linha</span><strong id="bet-per-line-label">5</strong></div>
+          <div class="stat-mini"><span>Linhas</span><strong id="lines-label">25</strong></div>
+        </div>
+        <div class="jackpots">
+          <div class="jp"><span>GRAND</span><strong id="jp-grand">—</strong></div>
+          <div class="jp"><span>MAJOR</span><strong id="jp-major">—</strong></div>
+          <div class="jp"><span>MINOR</span><strong id="jp-minor">—</strong></div>
+        </div>
+      </header>
+
+      <section class="play">
+        <div class="side-wrap">
+          <div id="lines-left" class="lines-col"></div>
+        </div>
+        <div class="stage">
+          <div class="frame-box">
+            <canvas id="payline-canvas" class="payline-canvas"></canvas>
+            <div id="reels" class="reels"></div>
+          </div>
+        </div>
+        <div class="side-wrap">
+          <div id="lines-right" class="lines-col"></div>
+        </div>
+      </section>
+
+      <div class="status">
+        <div class="status-grid">
+          <div class="status-item"><span>Crédito</span><strong id="balance">0</strong></div>
+          <div class="status-item msg-wrap">
+            <span id="msg-text" class="msg-text"></span>
+          </div>
+          <div class="status-item"><span>Aposta</span><strong id="alimento">125</strong></div>
+          <div class="status-item"><span>Ganho</span><strong id="gana" class="win">0</strong></div>
+        </div>
+      </div>
+
+      <nav class="panel">
+        <button type="button" id="btn-cobrar" class="pbtn">Atualizar</button>
+        <button type="button" id="btn-ayuda" class="pbtn">Tabela</button>
+        <button type="button" id="btn-lineas" class="pbtn">Linhas</button>
+        <button type="button" id="btn-aumento" class="pbtn">Aposta</button>
+        <button type="button" id="btn-show-lines" class="pbtn">Ver linhas</button>
+        <button type="button" id="btn-iniciar" class="pbtn spin">GIRAR</button>
+      </nav>
+    </div>
+  </div>
+
+  <div id="modal-ayuda" class="modal hidden">
+    <div class="modal-inner">
+      <h2>Tabela de Prêmios</h2>
+      <ul id="rules-list"></ul>
+      <div id="paytable"></div>
+      <button type="button" id="modal-close" class="modal-close">Fechar</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

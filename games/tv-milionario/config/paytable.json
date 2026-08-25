@@ -1,0 +1,96 @@
+{
+  "game": "tv-milionario",
+  "title": "TV Milionário",
+  "grid": { "cols": 5, "rows": 3 },
+  "lines": {
+    "max": 25,
+    "presets": [1, 5, 10, 15, 20, 25],
+    "minPerLine": 5,
+    "maxPerLine": 40,
+    "minTotal": 125,
+    "maxTotal": 1000
+  },
+  "betUnit": "centavos",
+  "payoutScale": {
+    "description": "Tabela base vale para aposta por linha >= 10. Abaixo de 10, prêmios e jackpots são ÷2.",
+    "fullScaleMinBetPerLine": 10,
+    "lowScaleFactor": 0.5
+  },
+  "formula": "premio = aposta_por_linha × multiplicador × escala",
+  "jackpots": {
+    "fullScale": { "grand": 2000, "major": 1000, "minor": 500 },
+    "lowScale": { "grand": 1000, "major": 500, "minor": 250 }
+  },
+  "symbols": [
+    {
+      "id": "host_man",
+      "name": "Apresentador",
+      "win_3": 250,
+      "win_4": 2000,
+      "win_5": 6000
+    },
+    {
+      "id": "host_woman",
+      "name": "Apresentadora",
+      "win_3": 100,
+      "win_4": 1000,
+      "win_5": 4500
+    },
+    {
+      "id": "jet",
+      "name": "Jato",
+      "win_3": 50,
+      "win_4": 400,
+      "win_5": 3000
+    },
+    {
+      "id": "yacht",
+      "name": "Iate",
+      "win_3": 40,
+      "win_4": 300,
+      "win_5": 2500
+    },
+    {
+      "id": "mansion",
+      "name": "Mansão",
+      "win_3": 30,
+      "win_4": 250,
+      "win_5": 2000
+    },
+    {
+      "id": "car",
+      "name": "Carro esportivo",
+      "win_3": 20,
+      "win_4": 200,
+      "win_5": 1500
+    },
+    {
+      "id": "ring",
+      "name": "Anel de diamante",
+      "win_3": 15,
+      "win_4": 150,
+      "win_5": 1000
+    },
+    {
+      "id": "cash",
+      "name": "Maço de dinheiro",
+      "win_3": 10,
+      "win_4": 75,
+      "win_5": 750
+    },
+    {
+      "id": "camera",
+      "name": "Câmera de TV",
+      "win_3": 5,
+      "win_4": 50,
+      "win_5": 500
+    },
+    {
+      "id": "clapper",
+      "name": "Claquete",
+      "win_3": 2,
+      "win_4": 20,
+      "win_5": 250
+    }
+  ]
+}

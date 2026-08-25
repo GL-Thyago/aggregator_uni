@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)"/>
+  <circle cx="320" cy="60" r="80" fill="#e0e7ff" opacity="0.15"/>
+  <circle cx="60" cy="190" r="70" fill="#e0e7ff" opacity="0.12"/>
+  <rect x="24" y="160" width="352" height="56" rx="12" fill="rgba(0,0,0,0.25)"/>
+  <text x="200" y="198" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="22" font-weight="700">Fortune Rabbit</text>
+  <text x="200" y="92" text-anchor="middle" fill="#e0e7ff" font-family="Arial,sans-serif" font-size="48" font-weight="800" opacity="0.95">FR</text>
+</svg>

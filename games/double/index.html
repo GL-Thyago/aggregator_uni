@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Double</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="double-root">
+    <header class="top-bar">
+      <div class="brand">
+        <span class="brand-dice">◆</span>
+        <span class="brand-name">Double</span>
+      </div>
+      <div class="balance-wrap">
+        <span class="balance-label">Saldo</span>
+        <span class="balance-value" id="balance">—</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="bet-panel">
+        <div class="panel-tabs">
+          <button type="button" class="panel-tab active" data-tab="normal">Normal</button>
+          <button type="button" class="panel-tab" data-tab="auto">Auto</button>
+        </div>
+
+        <div class="panel-section" id="panel-normal">
+          <label class="field-label">Quantia</label>
+          <div class="amount-row">
+            <button type="button" class="amt-btn" id="btn-half">½</button>
+            <input type="number" id="bet" class="bet-input" value="10" min="1" step="0.01">
+            <button type="button" class="amt-btn" id="btn-double">2x</button>
+          </div>
+
+          <label class="field-label">Selecionar cor</label>
+          <div class="color-grid">
+            <button type="button" class="color-btn red active" data-color="red">
+              <span class="color-mult">x2</span>
+            </button>
+            <button type="button" class="color-btn white" data-color="white">
+              <span class="color-mult">x14</span>
+            </button>
+            <button type="button" class="color-btn black" data-color="black">
+              <span class="color-mult">x2</span>
+            </button>
+          </div>
+
+          <button type="button" class="play-btn" id="btn-play">Apostar</button>
+        </div>
+
+        <div class="panel-section hidden" id="panel-auto">
+          <label class="field-label">Quantia</label>
+          <div class="amount-row">
+            <button type="button" class="amt-btn" id="btn-half-auto">½</button>
+            <input type="number" id="bet-auto" class="bet-input" value="10" min="1" step="0.01">
+            <button type="button" class="amt-btn" id="btn-double-auto">2x</button>
+          </div>
+          <label class="field-label">Rodadas</label>
+          <input type="number" id="auto-rounds" class="bet-input" value="10" min="1" max="100">
+          <div class="color-grid">
+            <button type="button" class="color-btn red active" data-color-auto="red"><span class="color-mult">x2</span></button>
+            <button type="button" class="color-btn white" data-color-auto="white"><span class="color-mult">x14</span></button>
+            <button type="button" class="color-btn black" data-color-auto="black"><span class="color-mult">x2</span></button>
+          </div>
+          <button type="button" class="play-btn auto" id="btn-auto">Iniciar Auto</button>
+        </div>
+
+        <div class="panel-footer">
+          <button type="button" class="icon-btn" id="btn-rules" title="Regras">?</button>
+        </div>
+      </aside>
+
+      <main class="game-main">
+        <div class="status-bar">
+          <span id="status-text">Faça sua aposta</span>
+          <span id="countdown" class="countdown hidden"></span>
+        </div>
+
+        <div class="history-row">
+          <span class="history-label">Giros anteriores</span>
+          <div class="history-list" id="history-list"></div>
+        </div>
+
+        <div class="wheel-wrap">
+          <div class="wheel-pointer"></div>
+          <div class="wheel-track" id="wheel-track"></div>
+        </div>
+
+        <div id="message" class="message"></div>
+      </main>
+    </div>
+
+    <div class="modal hidden" id="rules-modal">
+      <div class="modal-box">
+        <h2>Regras do Double</h2>
+        <ul>
+          <li><strong>Vermelho (x2):</strong> ganha se cair nos números 1 a 7.</li>
+          <li><strong>Preto (x2):</strong> ganha se cair nos números 8 a 14.</li>
+          <li><strong>Branco (x14):</strong> ganha se cair no número 0.</li>
+          <li>A roleta possui 15 casas: 7 vermelhas, 7 pretas e 1 branca.</li>
+          <li>Aposta mínima e máxima conforme saldo da conta.</li>
+          <li>Prêmios integrais: vermelho/preto pagam <strong>2x</strong>, branco <strong>14x</strong>.</li>
+          <li><strong>80%</strong> de cada aposta vai para o fundo de prêmios; <strong>20%</strong> fica na banca.</li>
+          <li>Se o fundo de prêmios não cobre o valor, o resultado é sempre perda.</li>
+        </ul>
+        <button type="button" class="play-btn" id="btn-close-rules">Entendi</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../_shared/instant-client.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
