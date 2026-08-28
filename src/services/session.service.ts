@@ -78,6 +78,7 @@ export async function createGameSession(input: {
     ? buildSalsaLaunchUrl({
         token: sessionToken,
         gameCode: game.externalGameId!,
+        openurl: game.externalUrl,
         currency,
         lang: "pt",
       })

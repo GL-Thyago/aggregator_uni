@@ -22,12 +22,33 @@ export function salsaPublisherUrl(): string {
   return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/api/v1/salsa/publisher`;
 }
 
+/** Código `game=` do openurl da Salsa (fonte da verdade no launch). */
+export function salsaGameCodeFromOpenUrl(openurl?: string | null): string | null {
+  if (!openurl) return null;
+  try {
+    const code = new URL(openurl).searchParams.get("game");
+    return code?.trim() || null;
+  } catch {
+    const match = String(openurl).match(/[?&]game=([^&]+)/i);
+    return match?.[1] ? decodeURIComponent(match[1]).trim() : null;
+  }
+}
+
+function isSalsaTestApi(base: string): boolean {
+  try {
+    return new URL(base).hostname.toLowerCase().includes("api-test");
+  } catch {
+    return /api-test/i.test(base);
+  }
+}
+
 export function buildSalsaLaunchUrl(input: {
   token: string;
   gameCode: string;
   lang?: string;
   currency?: string;
   type?: "CHARGED" | "FREE";
+  openurl?: string | null;
 }): string {
   const pn = env.SALSA_PN;
   if (!pn) {
@@ -36,12 +57,18 @@ export function buildSalsaLaunchUrl(input: {
 
   const base = env.SALSA_API_BASE.replace(/\/$/, "");
   const url = new URL(`${base}/game`);
+  const gameCode = salsaGameCodeFromOpenUrl(input.openurl) ?? input.gameCode.trim();
   url.searchParams.set("token", input.token);
   url.searchParams.set("pn", pn);
   url.searchParams.set("lang", input.lang ?? "pt");
-  url.searchParams.set("game", input.gameCode);
-  url.searchParams.set("type", input.type ?? "CHARGED");
-  if (input.currency) url.searchParams.set("currency", input.currency);
+  url.searchParams.set("game", gameCode);
+
+  // api-test não aceita type= (doc de teste: token, pn, lang, game). Produção usa type=CHARGED.
+  if (!isSalsaTestApi(base)) {
+    url.searchParams.set("type", input.type ?? "CHARGED");
+    if (input.currency) url.searchParams.set("currency", input.currency);
+  }
+
   return url.toString();
 }
 

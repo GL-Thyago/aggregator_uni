@@ -478,7 +478,11 @@ async function handleChangeGameToken(params: Record<string, string>) {
   }
 
   const newGame = await prisma.game.findFirst({
-    where: { externalGameId: newGameRef, isActive: true, provider: { isActive: true } },
+    where: {
+      isActive: true,
+      provider: { isActive: true },
+      OR: [{ externalGameId: newGameRef }, { name: newGameRef }],
+    },
   });
   if (!newGame) {
     return salsaFailure("ChangeGameToken", "Game not found.", "6005");

@@ -3,7 +3,12 @@ import path from "node:path";
 import axios from "axios";
 import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
-import { isLocalHostname, isSalsaConfigured, salsaPublisherUrl } from "../../config/salsa.js";
+import {
+  isLocalHostname,
+  isSalsaConfigured,
+  salsaGameCodeFromOpenUrl,
+  salsaPublisherUrl,
+} from "../../config/salsa.js";
 import { getSalsaRuntimeConfig } from "./salsa-config.service.js";
 import { salsaLogoToThumbnail } from "./salsa-logo.service.js";
 import type { GameType } from "../../../generated/prisma/client.js";
@@ -385,6 +390,7 @@ export async function syncSalsaGamesFromSource(options?: {
 
       const slug = `${provSlug}-${slugify(g.gameName)}`.slice(0, 80);
       const name = g.commercial_name?.trim() || g.gameName;
+      const launchCode = salsaGameCodeFromOpenUrl(g.openurl) ?? g.gameName.trim();
       const rtp = parseRtp(g.rtp);
 
       const existing = await prisma.game.findUnique({ where: { slug } });
@@ -401,8 +407,8 @@ export async function syncSalsaGamesFromSource(options?: {
           categoryId: category.id,
           gameType: cat.gameType,
           engine: "EXTERNAL",
-          externalGameId: g.gameName,
-          externalUrl: null,
+          externalGameId: launchCode,
+          externalUrl: g.openurl?.trim() || null,
           thumbnailUrl,
           rtp,
           aggregatorFeePct: Number(provider.defaultCostPct ?? costPct),
@@ -411,8 +417,8 @@ export async function syncSalsaGamesFromSource(options?: {
         update: {
           name,
           engine: "EXTERNAL",
-          externalGameId: g.gameName,
-          externalUrl: null,
+          externalGameId: launchCode,
+          externalUrl: g.openurl?.trim() || null,
           ...(thumbnailUrl ? { thumbnailUrl } : {}),
           rtp: rtp ?? undefined,
           aggregatorFeePct: Number(provider.defaultCostPct ?? costPct),

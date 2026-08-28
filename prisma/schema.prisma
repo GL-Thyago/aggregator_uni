@@ -195,7 +195,7 @@ model Game {
   assetPath    String?    @map("asset_path")
   /// URL externa quando engine=EXTERNAL ou IFRAME
   externalUrl    String?    @map("external_url")
-  /// Código do jogo no provedor externo (ex.: gameName Salsa)
+  /// Código `game=` no launch Salsa (vem do openurl; não é o nome comercial)
   externalGameId String?    @map("external_game_id")
   thumbnailUrl   String?    @map("thumbnail_url")
   rtp          Decimal?   @db.Decimal(5, 2)
