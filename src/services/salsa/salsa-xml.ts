@@ -45,12 +45,12 @@ function encodeXml(value: string): string {
 
 export function salsaSuccess(
   method: string,
-  fields: Record<string, string | number | boolean>,
+  fields: Record<string, string | number | boolean | bigint>,
 ): string {
   const body = Object.entries(fields)
     .map(([key, val]) => {
       const type =
-        typeof val === "boolean" ? "bool" : typeof val === "number" ? "int" : "string";
+        typeof val === "boolean" ? "bool" : typeof val === "bigint" ? "long" : typeof val === "number" ? "int" : "string";
       return `<${key} Type="${type}" Value="${encodeXml(String(val))}" />`;
     })
     .join("\n");
@@ -66,7 +66,10 @@ export function salsaFailure(
 ): string {
   const extras = extra
     ? Object.entries(extra)
-        .map(([key, val]) => `<${key} Type="string" Value="${encodeXml(String(val))}" />`)
+        .map(([key, val]) => {
+          const type = typeof val === "number" ? "int" : "string";
+          return `<${key} Type="${type}" Value="${encodeXml(String(val))}" />`;
+        })
         .join("\n")
     : "";
 
