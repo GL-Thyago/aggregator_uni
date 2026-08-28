@@ -177,6 +177,7 @@ function isUsableSalsaToken(token: string): boolean {
   if (t.length < 8) return false;
   if (t.includes(":")) return false;
   if (t.startsWith("{") || t.startsWith("$")) return false;
+  if (/^token$/i.test(t)) return false;
   return true;
 }
 
@@ -235,6 +236,9 @@ async function resolveSalsaSession(
 ) {
   if (!token.trim()) {
     return { error: salsaFailure(method, "Invalid request", "1") };
+  }
+  if (!isUsableSalsaToken(token)) {
+    return { error: expiredError(method) };
   }
 
   const existing = await loadSessionByToken(token);
@@ -687,16 +691,16 @@ async function handleChangeGameToken(params: Record<string, string>) {
   if (resolved.error) return resolved.error;
   const session = resolved.session!;
 
-  const newGame = await prisma.game.findFirst({
-    where: {
-      isActive: true,
-      provider: { isActive: true },
-      OR: [{ externalGameId: newGameRef }, { name: newGameRef }],
-    },
-  });
-  if (!newGame) {
-    return salsaFailure("ChangeGameToken", "Game not found.", "6005");
-  }
+  const newGame =
+    (newGameRef
+      ? await prisma.game.findFirst({
+          where: {
+            isActive: true,
+            provider: { isActive: true },
+            OR: [{ externalGameId: newGameRef }, { name: newGameRef }, { slug: newGameRef }],
+          },
+        })
+      : null) ?? session.game;
 
   const newToken = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -706,17 +710,27 @@ async function handleChangeGameToken(params: Record<string, string>) {
     session.currency,
   );
 
-  await prisma.gameSession.create({
-    data: {
-      clientId: session.clientId,
-      gameId: newGame.id,
-      externalUserId: session.externalUserId,
-      sessionToken: newToken,
-      balance,
-      currency: session.currency,
-      expiresAt,
-    },
-  });
+  await prisma.$transaction([
+    prisma.gameSession.updateMany({
+      where: {
+        clientId: session.clientId,
+        externalUserId: session.externalUserId,
+        isActive: true,
+      },
+      data: { isActive: false },
+    }),
+    prisma.gameSession.create({
+      data: {
+        clientId: session.clientId,
+        gameId: newGame.id,
+        externalUserId: session.externalUserId,
+        sessionToken: newToken,
+        balance,
+        currency: session.currency,
+        expiresAt,
+      },
+    }),
+  ]);
 
   return salsaSuccess("ChangeGameToken", {
     Token: token,

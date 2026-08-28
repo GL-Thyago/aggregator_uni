@@ -1,4 +1,5 @@
 import axios from "axios";
+import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { signWalletPayload } from "../lib/wallet-sign.js";
 
@@ -91,6 +92,17 @@ export async function processWalletSpin(
   return data;
 }
 
+function resolveWalletUrl(walletUrl: string): string {
+  if (!/localhost|127\.0\.0\.1/i.test(walletUrl)) return walletUrl;
+  if (env.BACK_UNI_WALLET_URL) return env.BACK_UNI_WALLET_URL.replace(/\/$/, "");
+  if (env.NODE_ENV === "production") {
+    console.warn(
+      `[Wallet] walletUrl aponta para ${walletUrl}; em produção use BACK_UNI_WALLET_URL (ex. https://b.sorteiobr.com/api/casino/wallet)`,
+    );
+  }
+  return walletUrl;
+}
+
 export async function getClientWalletConfig(clientId: string): Promise<WalletClientConfig | null> {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
@@ -100,7 +112,7 @@ export async function getClientWalletConfig(clientId: string): Promise<WalletCli
   if (!client?.walletUrl || !client.walletSecret) return null;
 
   return {
-    walletUrl: client.walletUrl,
+    walletUrl: resolveWalletUrl(client.walletUrl),
     walletSecret: client.walletSecret,
   };
 }

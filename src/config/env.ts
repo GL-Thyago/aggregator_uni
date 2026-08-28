@@ -37,6 +37,8 @@ const envSchema = z.object({
   /** URL pública que a Salsa chama (túnel/produção). Sem isso, localhost gera Communication error. */
   SALSA_PUBLISHER_URL: z.string().optional(),
   SALSA_DEFAULT_COST_PCT: z.coerce.number().default(6.5),
+  /** Wallet do cassino (back_uni). Se o cliente ainda tiver localhost, produção usa este URL. */
+  BACK_UNI_WALLET_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
