@@ -441,6 +441,13 @@ router.get("/integrations/salsa/status", async (_req, res) => {
   res.json(await getSalsaIntegrationStatus());
 });
 
+router.get("/integrations/salsa/last-request", async (_req, res) => {
+  const { getSalsaPublisherTrace } = await import(
+    "../../../services/salsa/salsa-publisher.service.js"
+  );
+  res.json(getSalsaPublisherTrace());
+});
+
 router.post("/integrations/salsa/sync", async (req, res) => {
   const { syncSalsaGamesFromSource } = await import("../../../services/salsa/salsa-sync.service.js");
   try {

@@ -20,6 +20,53 @@ import type { SalsaTxKind } from "../../../generated/prisma/client.js";
 
 let activeHashKey: string | undefined;
 
+export type SalsaPublisherTrace = {
+  at: string;
+  method: string;
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+  token?: string;
+  requestXml: string;
+  responseXml: string;
+};
+
+let lastTrace: SalsaPublisherTrace | null = null;
+let lastFailure: SalsaPublisherTrace | null = null;
+
+export function getSalsaPublisherTrace(): {
+  last: SalsaPublisherTrace | null;
+  lastFailure: SalsaPublisherTrace | null;
+} {
+  return { last: lastTrace, lastFailure };
+}
+
+function recordPublisherTrace(xml: string, method: string, token: string | undefined, response: string) {
+  const success = /Success="1"/i.test(response);
+  const error = response.match(/<Error\b[^>]*\bValue="([^"]*)"/i)?.[1];
+  const errorCode = response.match(/<ErrorCode\b[^>]*\bValue="([^"]*)"/i)?.[1];
+  const trace: SalsaPublisherTrace = {
+    at: new Date().toISOString(),
+    method,
+    success,
+    error: error ?? undefined,
+    errorCode,
+    token,
+    requestXml: xml,
+    responseXml: response,
+  };
+  lastTrace = trace;
+  if (!success) {
+    lastFailure = trace;
+    console.error(
+      `[Salsa] FALHA ${method} code=${errorCode ?? "-"} error=${error ?? "-"} token=${token ?? "-"}`,
+    );
+    console.error(`[Salsa] Último XML (request):`, xml.replace(/\s+/g, " ").slice(0, 2000));
+  } else {
+    console.log(`[Salsa] OK ${method} token=${token ?? "-"}`);
+  }
+}
+
 function checkSalsaHash(paramsValue: string, hash: string): boolean {
   return validateSalsaHash(paramsValue, hash, activeHashKey);
 }
@@ -64,42 +111,54 @@ async function findSalsaTx(
 }
 
 async function handleGetAccountDetails(token: string, hash: string) {
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("GetAccountDetails", "Invalid token.", "6001");
-  }
+  try {
+    const session = await loadSessionByToken(token);
+    if (!session) {
+      return salsaFailure("GetAccountDetails", "Invalid token.", "6001");
+    }
 
-  if (!checkSalsaHash(token, hash)) {
-    return hashError("GetAccountDetails", await playerBalanceCents(session), session.currency);
-  }
+    if (!checkSalsaHash(token, hash)) {
+      return hashError("GetAccountDetails", await playerBalanceCents(session), session.currency);
+    }
 
-  return salsaSuccess("GetAccountDetails", {
-    Token: token,
-    LoginName: session.externalUserId,
-    Currency: session.currency,
-    Country: "BR",
-    Birthdate: "1990-01-01",
-    Registration: "2020-01-01",
-    Gender: "m",
-  });
+    return salsaSuccess("GetAccountDetails", {
+      Token: token,
+      LoginName: session.externalUserId,
+      Currency: session.currency,
+      Country: "BR",
+      Birthdate: "1990-01-01",
+      Registration: "2020-01-01",
+      Gender: "m",
+    });
+  } catch (e) {
+    return salsaFailure(
+      "GetAccountDetails",
+      e instanceof Error ? e.message : "GetAccountDetails failed.",
+      "6001",
+    );
+  }
 }
 
 async function handleGetBalance(token: string, hash: string) {
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("GetBalance", "Invalid token.", "6001");
-  }
+  try {
+    const session = await loadSessionByToken(token);
+    if (!session) {
+      return salsaFailure("GetBalance", "Invalid token.", "6001");
+    }
 
-  if (!checkSalsaHash(token, hash)) {
-    return hashError("GetBalance", await playerBalanceCents(session), session.currency);
-  }
+    if (!checkSalsaHash(token, hash)) {
+      return hashError("GetBalance", await playerBalanceCents(session), session.currency);
+    }
 
-  const balance = await playerBalanceCents(session);
-  return salsaSuccess("GetBalance", {
-    Token: token,
-    Balance: balance,
-    Currency: session.currency,
-  });
+    const balance = await playerBalanceCents(session);
+    return salsaSuccess("GetBalance", {
+      Token: token,
+      Balance: balance,
+      Currency: session.currency,
+    });
+  } catch (e) {
+    return salsaFailure("GetBalance", e instanceof Error ? e.message : "GetBalance failed.", "6002");
+  }
 }
 
 async function handlePlaceBet(params: Record<string, string>) {
@@ -531,25 +590,43 @@ export async function handleSalsaPublisherRequest(xml: string): Promise<string> 
     String(xml).replace(/\s+/g, " ").slice(0, 240),
   );
   if (!parsed) {
-    return salsaFailure("Unknown", "Invalid XML packet.", "9002");
+    const response = salsaFailure("Unknown", "Invalid XML packet.", "9002");
+    recordPublisherTrace(xml, "Unknown", undefined, response);
+    return response;
   }
 
   const { method, params } = parsed;
-
-  switch (method) {
-    case "GetAccountDetails":
-      return handleGetAccountDetails(params.Token ?? "", params.Hash ?? "");
-    case "GetBalance":
-      return handleGetBalance(params.Token ?? "", params.Hash ?? "");
-    case "PlaceBet":
-      return handlePlaceBet(params);
-    case "AwardWinnings":
-      return handleAwardWinnings(params);
-    case "RefundBet":
-      return handleRefundBet(params);
-    case "ChangeGameToken":
-      return handleChangeGameToken(params);
-    default:
-      return salsaFailure(method, `Unknown method: ${method}`, "9003");
+  let response: string;
+  try {
+    switch (method) {
+      case "GetAccountDetails":
+        response = await handleGetAccountDetails(params.Token ?? "", params.Hash ?? "");
+        break;
+      case "GetBalance":
+        response = await handleGetBalance(params.Token ?? "", params.Hash ?? "");
+        break;
+      case "PlaceBet":
+        response = await handlePlaceBet(params);
+        break;
+      case "AwardWinnings":
+        response = await handleAwardWinnings(params);
+        break;
+      case "RefundBet":
+        response = await handleRefundBet(params);
+        break;
+      case "ChangeGameToken":
+        response = await handleChangeGameToken(params);
+        break;
+      default:
+        response = salsaFailure(method, `Unknown method: ${method}`, "9003");
+    }
+  } catch (e) {
+    response = salsaFailure(
+      method,
+      e instanceof Error ? e.message : "Internal error",
+      "500",
+    );
   }
+  recordPublisherTrace(xml, method, params.Token, response);
+  return response;
 }

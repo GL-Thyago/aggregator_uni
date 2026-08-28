@@ -35,7 +35,7 @@ export const API_ROUTES: RouteInfo[] = [
   { method: "GET", path: "/admin/v1/rtp/dashboard", auth: "admin", description: "Dashboard RTP/retenção por jogo (apostado, pago, retido)" },
   { method: "GET", path: "/admin/v1/fees/report", auth: "admin", description: "Relatório de taxas cobradas (GGR, gameFee, clientFee)" },
   { method: "GET", path: "/admin/v1/clients/:id/rtp", auth: "admin", description: "RTP por cliente (?gameId= opcional)" },
-  { method: "POST", path: "/admin/v1/integrations/salsa/sync", auth: "admin", description: "Importar catálogo externo" },
+  { method: "GET", path: "/admin/v1/integrations/salsa/last-request", auth: "admin", description: "Último XML da Salsa (GPI: ver a requisição que falhou)" },
   { method: "POST", path: "/admin/v1/integrations/salsa/publish", auth: "admin", description: "Ativar catálogo externo e liberar para operadores" },
 ];
 

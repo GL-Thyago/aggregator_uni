@@ -315,6 +315,48 @@ export async function hideNonSalsaCatalog() {
     },
     data: { isActive: false },
   });
+  await ensureGpiValidationGame();
+}
+
+/** Jogo de certificação GPI da Salsa (`game=gpi-validation`). */
+export async function ensureGpiValidationGame() {
+  const provider = await prisma.gameProvider.findFirst({
+    where: { OR: [{ slug: "salsa" }, { integration: "SALSA" }] },
+    orderBy: { id: "asc" },
+  });
+  if (!provider) return null;
+
+  await prisma.gameProvider.update({
+    where: { id: provider.id },
+    data: { isActive: true, integration: "SALSA" },
+  });
+
+  const category = await prisma.gameCategory.upsert({
+    where: { slug: "slots" },
+    create: { slug: "slots", name: "Slots", sortOrder: 1 },
+    update: {},
+  });
+
+  return prisma.game.upsert({
+    where: { slug: "gpi-validation" },
+    create: {
+      slug: "gpi-validation",
+      name: "GPI Validation",
+      providerId: provider.id,
+      categoryId: category.id,
+      gameType: "SLOT",
+      engine: "EXTERNAL",
+      externalGameId: "gpi-validation",
+      isActive: true,
+    },
+    update: {
+      name: "GPI Validation",
+      engine: "EXTERNAL",
+      externalGameId: "gpi-validation",
+      isActive: true,
+      providerId: provider.id,
+    },
+  });
 }
 
 export async function syncSalsaGamesFromSource(options?: {

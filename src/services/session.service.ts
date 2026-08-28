@@ -74,11 +74,13 @@ export async function createGameSession(input: {
   });
 
   const apiBridge = `${env.PUBLIC_BASE_URL}/api/v1/game/${sessionToken}`;
+  const gpiValidation =
+    game.slug === "gpi-validation" || game.externalGameId === "gpi-validation";
   const launchUrl = isExternal
     ? buildSalsaLaunchUrl({
         token: sessionToken,
-        gameCode: game.externalGameId!,
-        openurl: game.externalUrl,
+        gameCode: gpiValidation ? "gpi-validation" : game.externalGameId!,
+        openurl: gpiValidation ? null : game.externalUrl,
         currency,
         lang: "pt",
       })
