@@ -16,7 +16,7 @@ COPY scripts ./scripts
 COPY admin ./admin
 COPY aggregator_adm ./aggregator_adm
 
-RUN npx prisma generate && npm run build
+RUN npx prisma generate
 
 FROM node:22-bookworm-slim
 
@@ -31,7 +31,6 @@ ENV PORT=3010
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY --from=build /app/dist ./dist
 COPY --from=build /app/generated ./generated
 COPY prisma ./prisma
 COPY prisma.config.ts ./

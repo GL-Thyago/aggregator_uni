@@ -87,6 +87,9 @@ export function startRestServer(): void {
     console.log(`[REST] Aggregator ADM: http://localhost:${env.PORT}/aggregator-adm/`);
     console.log(`[REST] Salsa Publisher: http://localhost:${env.PORT}/api/v1/salsa/publisher`);
     console.log(`[REST] Games: http://localhost:${env.PORT}/games/ (dir: ${path.resolve(env.GAMES_DIR)})`);
+    void import("../../services/salsa/salsa-sync.service.js")
+      .then((m) => m.hideNonSalsaCatalog())
+      .catch((err: unknown) => console.error("[REST] hideNonSalsaCatalog failed", err));
   });
 
   httpServer.on("error", (err: NodeJS.ErrnoException) => {

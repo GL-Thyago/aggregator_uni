@@ -59,10 +59,10 @@ export function resolveThumbnailUrl(game: {
   assetPath: string | null;
   thumbnailUrl: string | null;
 }): string | null {
-  if (game.thumbnailUrl && /^https:\/\//i.test(game.thumbnailUrl)) {
-    return game.thumbnailUrl;
-  }
-  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/api/v1/media/cover/${encodeURIComponent(game.slug)}`;
+  const thumb = game.thumbnailUrl?.trim() ?? "";
+  if (/^data:image\//i.test(thumb)) return thumb;
+  if (/^https?:\/\//i.test(thumb)) return thumb;
+  return null;
 }
 
 export function toClientGameDto(g: GameWithRelations) {
@@ -94,7 +94,9 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
     where: {
       id: { in: allowedGameIds },
       isActive: true,
-      provider: { isActive: true },
+      engine: "EXTERNAL",
+      externalGameId: { not: null },
+      provider: { isActive: true, integration: "SALSA" },
     },
     include: { category: true, provider: true },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }],

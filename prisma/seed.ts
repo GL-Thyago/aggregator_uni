@@ -13,8 +13,8 @@ async function main() {
 
   const proprietary = await prisma.gameProvider.upsert({
     where: { slug: "uni-games" },
-    create: { slug: "uni-games", name: "Uni Games (Próprios)", integration: "NATIVE", isActive: true },
-    update: { name: "Uni Games (Próprios)", integration: "NATIVE" },
+    create: { slug: "uni-games", name: "Uni Games (Próprios)", integration: "NATIVE", isActive: false },
+    update: { name: "Uni Games (Próprios)", integration: "NATIVE", isActive: false },
   });
 
   await prisma.gameProvider.upsert({
@@ -41,7 +41,7 @@ async function main() {
     update: { integration: "DIRECT", defaultCostPct: 8 },
   });
 
-  console.log("Provedores: uni-games (ativo), salsa (inativo), pg-soft (inativo — desabilite/ative no admin)");
+  console.log("Provedores: uni-games (inativo no cassino), salsa/pg-soft (ative no admin após salsa:sync)");
 
   await prisma.salsaIntegrationConfig.upsert({
     where: { id: 1 },
@@ -117,6 +117,7 @@ async function main() {
         maxBet: (g as { maxBet?: number }).maxBet ?? 500,
         isFeatured: g.isFeatured ?? false,
         sortOrder: g.sortOrder,
+        isActive: false,
       },
       update: {
         name: g.name,
@@ -130,6 +131,7 @@ async function main() {
         maxBet: (g as { maxBet?: number }).maxBet ?? 500,
         isFeatured: g.isFeatured ?? false,
         sortOrder: g.sortOrder,
+        isActive: false,
       },
     });
   }

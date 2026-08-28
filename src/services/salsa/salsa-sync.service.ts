@@ -5,7 +5,7 @@ import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
 import { isLocalHostname, isSalsaConfigured, salsaPublisherUrl } from "../../config/salsa.js";
 import { getSalsaRuntimeConfig } from "./salsa-config.service.js";
-import { persistSalsaLogo } from "./salsa-logo.service.js";
+import { salsaLogoToThumbnail } from "./salsa-logo.service.js";
 import type { GameType } from "../../../generated/prisma/client.js";
 
 function slugify(name: string): string {
@@ -40,14 +40,27 @@ function pickString(g: Record<string, unknown>, ...keys: string[]): string | nul
   return null;
 }
 
-function resolveSalsaLogo(slug: string, g: SalsaGameJson): string | null {
+function pickNumericId(g: Record<string, unknown>): string | null {
+  for (const key of ["gameId", "gameID", "id", "cmsId", "logoId"]) {
+    const value = g[key];
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return String(Math.trunc(value));
+    if (typeof value === "string" && /^\d+$/.test(value.trim())) return value.trim();
+  }
+  return null;
+}
+
+function resolveSalsaLogo(g: SalsaGameJson): string | null {
   const rec = g as unknown as Record<string, unknown>;
-  return persistSalsaLogo(slug, {
+  const fromSalsa = salsaLogoToThumbnail({
     gameLogoUrl:
       pickString(rec, "gameLogoUrl", "GameLogoUrl", "logo", "imageUrl", "image", "icon", "thumbnail", "thumbnailUrl") ??
       null,
     gameLogo: pickString(rec, "gameLogo", "GameLogo") ?? null,
   });
+  if (fromSalsa) return fromSalsa;
+  const id = pickNumericId(rec);
+  if (id) return `https://cms.salsagator.com/games/${id}.png`;
+  return null;
 }
 
 function parseRtp(rtp?: string): number | null {
@@ -64,6 +77,7 @@ interface SalsaGameJson {
   openurl?: string;
   gameLogoUrl?: string;
   gameLogo?: string;
+  gameId?: string;
   tableLimit?: string;
   logo?: string;
   image?: string;
@@ -93,6 +107,11 @@ function catalogBaseUrl(raw: string): URL {
   const url = new URL(raw);
   url.searchParams.delete("provider");
   return url;
+}
+
+function applySalsaLogoFlag(url: URL) {
+  if (env.SALSA_GAME_LOGO) url.searchParams.set("gameLogo", "true");
+  else url.searchParams.delete("gameLogo");
 }
 
 function salsaRateLimitMessage(data: unknown): string | null {
@@ -140,6 +159,7 @@ function mergeProviderPage(
         gameName: String(g.gameName ?? "").trim(),
         gameLogo: pickString(rec, "gameLogo", "GameLogo") ?? g.gameLogo,
         gameLogoUrl: pickString(rec, "gameLogoUrl", "GameLogoUrl") ?? g.gameLogoUrl,
+        gameId: pickNumericId(rec) ?? undefined,
       };
     });
     const existing = bySlug.get(key);
@@ -163,6 +183,7 @@ async function fetchSalsaProviderPage(
 ): Promise<{ providers: SalsaProviderJson[]; rateLimited?: string }> {
   const url = new URL(base);
   url.searchParams.set("provider", String(providerId));
+  applySalsaLogoFlag(url);
   try {
     const { data, status } = await axios.get<{ data?: { providers?: SalsaProviderJson[] }; error?: string }>(
       url.toString(),
@@ -265,6 +286,7 @@ export async function getSalsaIntegrationStatus() {
     pn: env.SALSA_PN ?? null,
     hasHashKey: Boolean(env.SALSA_HASH_KEY),
     gameListUrl: env.SALSA_GAME_LIST_URL ?? null,
+    gameLogo: env.SALSA_GAME_LOGO,
     apiBase: env.SALSA_API_BASE,
     defaultCostPct: env.SALSA_DEFAULT_COST_PCT,
     providerActive: salsaProviders.some((p) => p.isActive),
@@ -277,11 +299,26 @@ export async function getSalsaIntegrationStatus() {
   };
 }
 
+export async function hideNonSalsaCatalog() {
+  await prisma.gameProvider.updateMany({
+    where: { integration: { not: "SALSA" } },
+    data: { isActive: false },
+  });
+  await prisma.game.updateMany({
+    where: {
+      OR: [{ engine: { not: "EXTERNAL" } }, { externalGameId: null }],
+    },
+    data: { isActive: false },
+  });
+}
+
 export async function syncSalsaGamesFromSource(options?: {
   gameListUrl?: string;
   activateProvider?: boolean;
   defaultCostPct?: number;
 }) {
+  await hideNonSalsaCatalog();
+
   const cfg = await getSalsaRuntimeConfig();
   const url = options?.gameListUrl ?? cfg.gameListUrl ?? env.SALSA_GAME_LIST_URL;
   if (!url) {
@@ -351,10 +388,9 @@ export async function syncSalsaGamesFromSource(options?: {
       const rtp = parseRtp(g.rtp);
 
       const existing = await prisma.game.findUnique({ where: { slug } });
-      const hadBase64 = Boolean(g.gameLogo && String(g.gameLogo).length > 32);
-      const thumbnailUrl = resolveSalsaLogo(slug, g);
-      if (thumbnailUrl) logosFromUrl += 1;
-      else if (hadBase64) logosFromBase64 += 1;
+      const thumbnailUrl = resolveSalsaLogo(g);
+      if (thumbnailUrl?.startsWith("data:")) logosFromBase64 += 1;
+      else if (thumbnailUrl) logosFromUrl += 1;
 
       await prisma.game.upsert({
         where: { slug },

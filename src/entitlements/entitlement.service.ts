@@ -60,7 +60,13 @@ export async function getAllowedGameIds(clientId: string): Promise<number[]> {
       gameIds.push(row.gameId);
     } else {
       const games = await prisma.game.findMany({
-        where: { categoryId: row.categoryId, isActive: true, provider: { isActive: true } },
+        where: {
+          categoryId: row.categoryId,
+          isActive: true,
+          engine: "EXTERNAL",
+          externalGameId: { not: null },
+          provider: { isActive: true, integration: "SALSA" },
+        },
         select: { id: true },
       });
       gameIds.push(...games.map((g) => g.id));
@@ -118,7 +124,9 @@ export async function getEntitledGamesTree(clientId: string) {
         where: {
           id: { in: allowedGameIds },
           isActive: true,
-          provider: { isActive: true },
+          engine: "EXTERNAL",
+          externalGameId: { not: null },
+          provider: { isActive: true, integration: "SALSA" },
         },
         include: { provider: true },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],

@@ -15,14 +15,18 @@ export async function getSalsaRuntimeConfig(): Promise<SalsaRuntimeConfig> {
   const row = await prisma.salsaIntegrationConfig.findUnique({ where: { id: 1 } });
 
   if (row) {
+    const pn = process.env.SALSA_PN || row.publisherName || env.SALSA_PN || null;
+    const hashKey = process.env.SALSA_HASH_KEY || row.hashKey || env.SALSA_HASH_KEY || null;
+    const gameListUrl = process.env.SALSA_GAME_LIST_URL || row.gameListUrl || env.SALSA_GAME_LIST_URL || null;
+    const apiBase = process.env.SALSA_API_BASE || row.apiBase || env.SALSA_API_BASE;
     return {
-      enabled: row.enabled || env.SALSA_ENABLED,
-      publisherName: row.publisherName ?? env.SALSA_PN ?? null,
-      hashKey: row.hashKey ?? env.SALSA_HASH_KEY ?? null,
-      gameListUrl: row.gameListUrl ?? env.SALSA_GAME_LIST_URL ?? null,
-      apiBase: row.apiBase || env.SALSA_API_BASE,
-      defaultProviderCostPct: Number(row.defaultProviderCostPct),
-      source: row.publisherName || row.hashKey ? "db" : "env",
+      enabled: env.SALSA_ENABLED || row.enabled,
+      publisherName: pn,
+      hashKey,
+      gameListUrl,
+      apiBase,
+      defaultProviderCostPct: Number(row.defaultProviderCostPct) || env.SALSA_DEFAULT_COST_PCT,
+      source: process.env.SALSA_PN || process.env.SALSA_GAME_LIST_URL ? "env" : "db",
     };
   }
 

@@ -31,4 +31,4 @@ if [ "${RUN_SEED:-false}" = "true" ]; then
 fi
 
 echo "[docker] Starting aggregator on port ${PORT:-3010}"
-exec node dist/index.js
+exec npx tsx src/index.ts

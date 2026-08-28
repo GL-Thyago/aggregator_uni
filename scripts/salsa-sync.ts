@@ -23,7 +23,7 @@ async function main() {
     console.log(`  Rate limit Salsa: ${result.rateLimited}`);
   }
   if (!(result.logosFromUrl || result.logosFromBase64)) {
-    console.log("  Aviso: o JSON desta conta não enviou gameLogo/gameLogoUrl — capas usam fallback até a Salsa preencher esses campos.");
+    console.log("  Aviso: o JSON desta conta não trouxe gameLogo/gameLogoUrl — as capas só aparecem quando a Salsa enviar BASE64 ou URL.");
   }
   console.log("Catálogo ativado e liberado para os operadores.");
 }
