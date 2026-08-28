@@ -11,11 +11,12 @@ import { resolveClientGameFees } from "../client-game-fees.service.js";
 import {
   creditWin,
   debitBet,
+  getOrCreateWallet,
   getWalletBalance,
 } from "../player-wallet.service.js";
 import { getClientWalletConfig, processWalletSpin } from "../wallet.service.js";
 import { debitClientFees } from "../client-wallet.service.js";
-import { salsaFailure, salsaSuccess, parseSalsaRequest } from "./salsa-xml.js";
+import { salsaFailure, salsaSuccess, parseSalsaRequest, salsaParam } from "./salsa-xml.js";
 import type { SalsaTxKind } from "../../../generated/prisma/client.js";
 
 let activeHashKey: string | undefined;
@@ -83,15 +84,113 @@ async function playerBalanceCents(session: {
   externalUserId: string;
   currency: string;
 }) {
-  const balance = await getWalletBalance(session.clientId, session.externalUserId, session.currency);
-  return moneyToCents(balance);
+  try {
+    const balance = await getWalletBalance(session.clientId, session.externalUserId, session.currency);
+    return moneyToCents(balance);
+  } catch (err) {
+    console.warn("[Salsa] wallet remoto indisponível, usando saldo local:", err);
+    const wallet = await getOrCreateWallet({
+      clientId: session.clientId,
+      externalUserId: session.externalUserId,
+      currency: session.currency,
+    });
+    return moneyToCents(Number(wallet.balance));
+  }
 }
 
-function hashError(method: string, balanceCents: number, currency: string) {
-  return salsaFailure(method, "Invalid Hash.", "7000", {
-    Balance: balanceCents,
-    Currency: currency,
+function hashError(method: string, balanceCents?: number, currency?: string) {
+  return salsaFailure(method, "Invalid Hash", "7000", {
+    ...(balanceCents !== undefined ? { Balance: balanceCents, Currency: currency ?? "BRL" } : {}),
   });
+}
+
+function expiredError(method: string) {
+  return salsaFailure(method, "Token Expired", "2");
+}
+
+function sessionIsExpired(session: { expiresAt: Date; isActive: boolean }): boolean {
+  return !session.isActive || session.expiresAt.getTime() <= Date.now();
+}
+
+async function provisionSalsaSession(token: string, loginName?: string) {
+  const existing = await loadSessionByToken(token);
+  if (existing) return existing;
+
+  const { ensureGpiValidationGame } = await import("./salsa-sync.service.js");
+  const gpiGame = await ensureGpiValidationGame();
+  const client = await prisma.client.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const game =
+    gpiGame ??
+    (await prisma.game.findFirst({
+      where: { engine: "EXTERNAL", isActive: true },
+    }));
+
+  if (!client || !game) {
+    throw new Error("Sem cliente/jogo Salsa para criar sessão GPI");
+  }
+
+  const externalUserId = (loginName?.trim() || `gpi-${token.replace(/-/g, "").slice(0, 16)}`).slice(0, 64);
+
+  await prisma.playerWallet.upsert({
+    where: {
+      clientId_externalUserId_currency: {
+        clientId: client.id,
+        externalUserId,
+        currency: "BRL",
+      },
+    },
+    create: {
+      clientId: client.id,
+      externalUserId,
+      currency: "BRL",
+      balance: 10_000,
+    },
+    update: {},
+  });
+
+  return prisma.gameSession.create({
+    data: {
+      clientId: client.id,
+      gameId: game.id,
+      externalUserId,
+      sessionToken: token,
+      balance: 10_000,
+      currency: "BRL",
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    },
+    include: { game: { include: { provider: true } }, client: true },
+  });
+}
+
+async function resolveSalsaSession(
+  method: string,
+  token: string,
+  hash: string,
+  hashMaterial: string,
+  options?: { provision?: boolean; loginName?: string },
+) {
+  if (!token.trim()) {
+    return { error: salsaFailure(method, "Invalid request", "1") };
+  }
+
+  if (!checkSalsaHash(hashMaterial, hash)) {
+    return { error: hashError(method) };
+  }
+
+  let session = await loadSessionByToken(token);
+  if (!session && options?.provision) {
+    session = await provisionSalsaSession(token, options.loginName);
+  }
+  if (!session) {
+    return { error: salsaFailure(method, "Invalid token.", "6001") };
+  }
+  if (sessionIsExpired(session)) {
+    return { error: expiredError(method) };
+  }
+  return { session };
 }
 
 async function findSalsaTx(
@@ -110,16 +209,16 @@ async function findSalsaTx(
   });
 }
 
-async function handleGetAccountDetails(token: string, hash: string) {
+async function handleGetAccountDetails(params: Record<string, string>) {
+  const token = salsaParam(params, "Token");
+  const hash = salsaParam(params, "Hash");
   try {
-    const session = await loadSessionByToken(token);
-    if (!session) {
-      return salsaFailure("GetAccountDetails", "Invalid token.", "6001");
-    }
-
-    if (!checkSalsaHash(token, hash)) {
-      return hashError("GetAccountDetails", await playerBalanceCents(session), session.currency);
-    }
+    const resolved = await resolveSalsaSession("GetAccountDetails", token, hash, token, {
+      provision: true,
+      loginName: salsaParam(params, "LoginName", "UserName", "UserId"),
+    });
+    if (resolved.error) return resolved.error;
+    const session = resolved.session!;
 
     return salsaSuccess("GetAccountDetails", {
       Token: token,
@@ -139,16 +238,16 @@ async function handleGetAccountDetails(token: string, hash: string) {
   }
 }
 
-async function handleGetBalance(token: string, hash: string) {
+async function handleGetBalance(params: Record<string, string>) {
+  const token = salsaParam(params, "Token");
+  const hash = salsaParam(params, "Hash");
   try {
-    const session = await loadSessionByToken(token);
-    if (!session) {
-      return salsaFailure("GetBalance", "Invalid token.", "6001");
-    }
-
-    if (!checkSalsaHash(token, hash)) {
-      return hashError("GetBalance", await playerBalanceCents(session), session.currency);
-    }
+    const resolved = await resolveSalsaSession("GetBalance", token, hash, token, {
+      provision: true,
+      loginName: salsaParam(params, "LoginName", "UserName", "UserId"),
+    });
+    if (resolved.error) return resolved.error;
+    const session = resolved.session!;
 
     const balance = await playerBalanceCents(session);
     return salsaSuccess("GetBalance", {
@@ -162,21 +261,22 @@ async function handleGetBalance(token: string, hash: string) {
 }
 
 async function handlePlaceBet(params: Record<string, string>) {
-  const token = params.Token ?? "";
-  const transactionId = params.TransactionID ?? "";
-  const referenceNum = params.BetReferenceNum ?? "";
-  const betCents = Number(params.BetAmount ?? 0);
-  const hash = params.Hash ?? "";
+  const token = salsaParam(params, "Token");
+  const transactionId = salsaParam(params, "TransactionID");
+  const referenceNum = salsaParam(params, "BetReferenceNum");
+  const betCents = Number(salsaParam(params, "BetAmount") || 0);
+  const hash = salsaParam(params, "Hash");
 
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("PlaceBet", "Invalid token.", "6001");
-  }
+  const resolved = await resolveSalsaSession(
+    "PlaceBet",
+    token,
+    hash,
+    transactionId + referenceNum + token,
+  );
+  if (resolved.error) return resolved.error;
+  const session = resolved.session!;
 
   const balanceBefore = await playerBalanceCents(session);
-  if (!checkSalsaHash(transactionId + referenceNum + token, hash)) {
-    return hashError("PlaceBet", balanceBefore, session.currency);
-  }
 
   const existing = await findSalsaTx(transactionId, referenceNum, "PLACE_BET");
   if (existing) {
@@ -217,36 +317,41 @@ async function handlePlaceBet(params: Record<string, string>) {
   let balanceAfterCents = balanceBefore;
 
   try {
-    if (walletConfig && betAmount > 0) {
-      const walletResult = await processWalletSpin(walletConfig, {
-        externalUserId: session.externalUserId,
-        gameSlug: session.game.slug,
-        betAmount,
-        winAmount: 0,
-        gameFeeAmount: fees.gameFeeAmount,
-        clientFeeAmount: fees.clientFeeAmount,
-        gameFeePct: fees.gameFeePct,
-        clientFeePct: fees.clientFeePct,
-        spinId,
-        sessionId: session.sessionToken,
-        currency: session.currency,
-      });
-      if (!walletResult.ok) {
-        return salsaFailure("PlaceBet", walletResult.error ?? "Wallet error.", "6002", {
-          Balance: balanceBefore,
-          Currency: session.currency,
-        });
+    if (betAmount > 0) {
+      let usedRemote = false;
+      if (walletConfig) {
+        try {
+          const walletResult = await processWalletSpin(walletConfig, {
+            externalUserId: session.externalUserId,
+            gameSlug: session.game.slug,
+            betAmount,
+            winAmount: 0,
+            gameFeeAmount: fees.gameFeeAmount,
+            clientFeeAmount: fees.clientFeeAmount,
+            gameFeePct: fees.gameFeePct,
+            clientFeePct: fees.clientFeePct,
+            spinId,
+            sessionId: session.sessionToken,
+            currency: session.currency,
+          });
+          if (walletResult.ok) {
+            balanceAfterCents = moneyToCents(walletResult.balanceAfter);
+            usedRemote = true;
+          }
+        } catch (err) {
+          console.warn("[Salsa] PlaceBet wallet remoto falhou, débito local:", err);
+        }
       }
-      balanceAfterCents = moneyToCents(walletResult.balanceAfter);
-    } else if (betAmount > 0) {
-      const betTx = await debitBet({
-        clientId: session.clientId,
-        externalUserId: session.externalUserId,
-        betAmount,
-        currency: session.currency,
-        referenceId: spinId,
-      });
-      balanceAfterCents = moneyToCents(betTx.balanceAfter);
+      if (!usedRemote) {
+        const betTx = await debitBet({
+          clientId: session.clientId,
+          externalUserId: session.externalUserId,
+          betAmount,
+          currency: session.currency,
+          referenceId: spinId,
+        });
+        balanceAfterCents = moneyToCents(betTx.balanceAfter);
+      }
     }
 
     await prisma.$transaction([
@@ -309,21 +414,22 @@ async function handlePlaceBet(params: Record<string, string>) {
 }
 
 async function handleAwardWinnings(params: Record<string, string>) {
-  const token = params.Token ?? "";
-  const transactionId = params.TransactionID ?? "";
-  const referenceNum = params.WinReferenceNum ?? "";
-  const winCents = Number(params.WinAmount ?? 0);
-  const hash = params.Hash ?? "";
+  const token = salsaParam(params, "Token");
+  const transactionId = salsaParam(params, "TransactionID");
+  const referenceNum = salsaParam(params, "WinReferenceNum");
+  const winCents = Number(salsaParam(params, "WinAmount") || 0);
+  const hash = salsaParam(params, "Hash");
 
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("AwardWinnings", "Invalid token.", "6001");
-  }
+  const resolved = await resolveSalsaSession(
+    "AwardWinnings",
+    token,
+    hash,
+    transactionId + referenceNum + token,
+  );
+  if (resolved.error) return resolved.error;
+  const session = resolved.session!;
 
   const balanceBefore = await playerBalanceCents(session);
-  if (!checkSalsaHash(transactionId + referenceNum + token, hash)) {
-    return hashError("AwardWinnings", balanceBefore, session.currency);
-  }
 
   const existing = await findSalsaTx(transactionId, referenceNum, "AWARD_WINNINGS");
   if (existing) {
@@ -430,21 +536,22 @@ async function handleAwardWinnings(params: Record<string, string>) {
 }
 
 async function handleRefundBet(params: Record<string, string>) {
-  const token = params.Token ?? "";
-  const transactionId = params.TransactionID ?? "";
-  const referenceNum = params.BetReferenceNum ?? "";
-  const refundCents = Number(params.RefundAmount ?? 0);
-  const hash = params.Hash ?? "";
+  const token = salsaParam(params, "Token");
+  const transactionId = salsaParam(params, "TransactionID");
+  const referenceNum = salsaParam(params, "BetReferenceNum");
+  const refundCents = Number(salsaParam(params, "RefundAmount") || 0);
+  const hash = salsaParam(params, "Hash");
 
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("RefundBet", "Invalid token.", "6001");
-  }
+  const resolved = await resolveSalsaSession(
+    "RefundBet",
+    token,
+    hash,
+    transactionId + referenceNum + token,
+  );
+  if (resolved.error) return resolved.error;
+  const session = resolved.session!;
 
   const balanceBefore = await playerBalanceCents(session);
-  if (!checkSalsaHash(transactionId + referenceNum + token, hash)) {
-    return hashError("RefundBet", balanceBefore, session.currency);
-  }
 
   const existing = await findSalsaTx(transactionId, referenceNum, "REFUND_BET");
   if (existing) {
@@ -523,18 +630,13 @@ async function handleRefundBet(params: Record<string, string>) {
 }
 
 async function handleChangeGameToken(params: Record<string, string>) {
-  const token = params.Token ?? "";
-  const newGameRef = params.NewGameReference ?? "";
-  const hash = params.Hash ?? "";
+  const token = salsaParam(params, "Token");
+  const newGameRef = salsaParam(params, "NewGameReference");
+  const hash = salsaParam(params, "Hash");
 
-  const session = await loadSessionByToken(token);
-  if (!session) {
-    return salsaFailure("ChangeGameToken", "Invalid token.", "6001");
-  }
-
-  if (!checkSalsaHash(newGameRef + token, hash)) {
-    return salsaFailure("ChangeGameToken", "Invalid Hash.", "7000");
-  }
+  const resolved = await resolveSalsaSession("ChangeGameToken", token, hash, newGameRef + token);
+  if (resolved.error) return resolved.error;
+  const session = resolved.session!;
 
   const newGame = await prisma.game.findFirst({
     where: {
@@ -600,10 +702,10 @@ export async function handleSalsaPublisherRequest(xml: string): Promise<string> 
   try {
     switch (method) {
       case "GetAccountDetails":
-        response = await handleGetAccountDetails(params.Token ?? "", params.Hash ?? "");
+        response = await handleGetAccountDetails(params);
         break;
       case "GetBalance":
-        response = await handleGetBalance(params.Token ?? "", params.Hash ?? "");
+        response = await handleGetBalance(params);
         break;
       case "PlaceBet":
         response = await handlePlaceBet(params);
@@ -627,6 +729,6 @@ export async function handleSalsaPublisherRequest(xml: string): Promise<string> 
       "500",
     );
   }
-  recordPublisherTrace(xml, method, params.Token, response);
+  recordPublisherTrace(xml, method, salsaParam(params, "Token") || undefined, response);
   return response;
 }

@@ -18,6 +18,15 @@ export function parseSalsaRequest(xml: string): { method: string; params: Record
   return { method: methodMatch[1]!, params };
 }
 
+export function salsaParam(params: Record<string, string>, ...keys: string[]): string {
+  const lower = new Map(Object.entries(params).map(([k, v]) => [k.toLowerCase(), v]));
+  for (const key of keys) {
+    const value = lower.get(key.toLowerCase());
+    if (value !== undefined && value !== "") return value;
+  }
+  return "";
+}
+
 function decodeXml(value: string): string {
   return value
     .replace(/&amp;/g, "&")

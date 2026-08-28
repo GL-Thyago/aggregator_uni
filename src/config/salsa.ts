@@ -63,10 +63,13 @@ export function buildSalsaLaunchUrl(input: {
   url.searchParams.set("lang", input.lang ?? "pt");
   url.searchParams.set("game", gameCode);
 
-  // api-test não aceita type= (doc de teste: token, pn, lang, game). Produção usa type=CHARGED.
-  if (!isSalsaTestApi(base)) {
-    url.searchParams.set("type", input.type ?? "CHARGED");
-    if (input.currency) url.searchParams.set("currency", input.currency);
+  const launchType =
+    env.SALSA_LAUNCH_TYPE ?? (isSalsaTestApi(base) ? "FREE" : "CHARGED");
+  if (launchType !== "omit") {
+    url.searchParams.set("type", input.type ?? launchType);
+  }
+  if (!isSalsaTestApi(base) && input.currency) {
+    url.searchParams.set("currency", input.currency);
   }
 
   return url.toString();

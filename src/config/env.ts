@@ -25,6 +25,8 @@ const envSchema = z.object({
   SALSA_HASH_KEY: z.string().optional(),
   SALSA_GAME_LIST_URL: z.string().optional(),
   SALSA_API_BASE: z.string().default("https://api-test.salsagator.com"),
+  /** CHARGED = dinheiro real. Staging da Salsa costuma ter CHARGED desligado — use FREE. */
+  SALSA_LAUNCH_TYPE: z.enum(["CHARGED", "FREE", "omit"]).optional(),
   /** Quantos IDs `provider=N` varrer. PG Soft ~42, Pragmatic e outros vêm depois de buracos 400. */
   SALSA_PROVIDER_SCAN_MAX: z.coerce.number().int().min(1).max(500).default(250),
   /** Doc Salsa: gameLogo default false. true inclui gameLogoUrl (CMS) e/ou BASE64. */
