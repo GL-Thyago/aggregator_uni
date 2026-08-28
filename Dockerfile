@@ -6,8 +6,14 @@ RUN apt-get update \
 
 WORKDIR /app
 
+ENV NPM_CONFIG_FETCH_RETRIES=8 \
+    NPM_CONFIG_FETCH_RETRY_FACTOR=2 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000
+
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 COPY prisma ./prisma
 COPY prisma.config.ts tsconfig.json ./
@@ -16,7 +22,7 @@ COPY scripts ./scripts
 COPY admin ./admin
 COPY aggregator_adm ./aggregator_adm
 
-RUN npx prisma generate
+RUN npx prisma generate && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
 
@@ -29,8 +35,7 @@ ENV NODE_ENV=production
 ENV PORT=3010
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/generated ./generated
 COPY prisma ./prisma
 COPY prisma.config.ts ./
