@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Uni — Integração para cassinos</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <div class="brand">Uni</div>
+      <div class="tag">Guia do cassino</div>
+      <nav>
+        <a href="/docs/uni/">Início</a>
+        <a href="/docs/uni/interno.html">Guia interno</a>
+        <a class="active" href="/docs/uni/cliente.html">Guia do cassino</a>
+      </nav>
+      <a class="dl" href="/docs/uni/download/cliente.md">Baixar este guia (.md)</a>
+      <a class="dl" href="/docs/uni/download/cliente.html">Baixar este guia (.html)</a>
+    </aside>
+    <main>
+      <h1>Como integrar seu cassino à Uni</h1>
+      <p class="lede">A Uni entrega o catálogo de jogos e a URL para o jogador jogar. O saldo continua no <strong>seu</strong> sistema. Vocês não falam com o estúdio de jogos — só com a Uni.</p>
+
+      <div class="actions">
+        <a href="/docs/uni/download/cliente.md">Baixar Markdown</a>
+        <a class="ghost" href="/docs/uni/download/cliente.html">Baixar HTML</a>
+      </div>
+
+      <h2>O que vocês fazem</h2>
+      <ol>
+        <li>Recebem uma API Key da Uni.</li>
+        <li>Informam a URL do vosso wallet (saldo do jogador) e um segredo compartilhado.</li>
+        <li>No site: listar jogos, pedir para abrir um jogo, colocar a <code>launchUrl</code> num iframe (ou nova aba).</li>
+        <li>No backend: responder saldo e aposta quando a Uni chamar.</li>
+      </ol>
+
+      <div class="flow">Seu site                Uni                   Seu wallet
+   |                      |                         |
+   |  listar jogos        |                         |
+   |--------------------->|                         |
+   |  abrir jogo          |                         |
+   |  (ID do jogador)     |                         |
+   |--------------------->|                         |
+   |  launchUrl           |                         |
+   |<---------------------|                         |
+   |  iframe do jogo      |                         |
+   |                      |  consulta / debita      |
+   |                      |------------------------>|
+   |                      |  saldo atualizado       |
+   |                      |<------------------------|</div>
+
+      <h2>Base da API</h2>
+      <p><code>https://rggames.site/api/v1</code></p>
+      <p>Header em todas as chamadas de vocês para a Uni:</p>
+<pre><code>X-Api-Key: &lt;a chave que a Uni enviou&gt;</code></pre>
+      <p>Opcional: <code>POST /auth/token</code> com <code>{ "apiKey" }</code> e depois <code>Authorization: Bearer …</code>.</p>
+
+      <h2>1. Listar jogos</h2>
+<pre><code>GET https://rggames.site/api/v1/games
+X-Api-Key: ca_...</code></pre>
+      <p>Usem o campo <code>slug</code> para abrir o jogo. Capa: <code>GET https://rggames.site/api/v1/media/cover/{slug}</code>.</p>
+      <p>Para copiar o catálogo para o vosso banco: <code>GET /api/v1/sync/games</code>.</p>
+
+      <h2>2. Abrir um jogo</h2>
+      <p><code>externalUserId</code> é o ID do jogador <strong>no vosso cassino</strong>. A Uni usa esse ID em todo movimento de saldo.</p>
+      <p>Teste (homologação):</p>
+<pre><code>POST https://rggames.site/api/v1/uni/test/games/{slug}/launch
+X-Api-Key: ca_...
+Content-Type: application/json
+
+{ "externalUserId": "20419622", "currency": "BRL" }</code></pre>
+      <p>Produção (dinheiro real):</p>
+<pre><code>POST https://rggames.site/api/v1/uni/live/games/{slug}/launch
+...</code></pre>
+      <p>Resposta:</p>
+<pre><code>{
+  "sessionToken": "uuid",
+  "launchUrl": "https://…",
+  "balance": 11000.00,
+  "expiresAt": "2026-08-29T…"
+}</code></pre>
+      <p>Abram <code>launchUrl</code> no iframe ou em nova aba. Não alterem a URL.</p>
+
+      <h2>3. Iframe</h2>
+      <p>No Content-Security-Policy do vosso site, em <code>frame-src</code>, liberem o <strong>domínio da <code>launchUrl</code></strong> (o host depois de <code>https://</code>, até a primeira <code>/</code>).</p>
+      <p>Se o CSP bloquear, o iframe fica em branco. Nesse caso o jogo ainda pode abrir em nova aba.</p>
+
+      <h2>4. Wallet (vocês implementam)</h2>
+      <p>A Uni chama o vosso servidor. Cadastro na Uni:</p>
+      <table>
+        <thead><tr><th>Campo</th><th>Exemplo</th></tr></thead>
+        <tbody>
+          <tr><td>walletUrl</td><td><code>https://seu-cassino.com/api/casino/wallet</code></td></tr>
+          <tr><td>walletSecret</td><td>mesmo segredo que vocês usam para validar a assinatura</td></tr>
+        </tbody>
+      </table>
+      <p>Toda request da Uni traz:</p>
+      <p><code>X-Wallet-Signature: HMAC-SHA256(corpo_bruto, walletSecret)</code> em hexadecimal.</p>
+      <p>Validem no body <strong>cru</strong> (string do JSON), não no objeto já parseado.</p>
+
+      <h3>Saldo</h3>
+<pre><code>POST {walletUrl}/balance
+
+{ "externalUserId": "20419622", "currency": "BRL" }
+
+→ { "balance": 11000.00, "currency": "BRL" }</code></pre>
+      <p><code>balance</code> em reais (número), não em centavos.</p>
+
+      <h3>Aposta e prêmio</h3>
+<pre><code>POST {walletUrl}/spin
+
+{
+  "externalUserId": "20419622",
+  "gameSlug": "superHotBingo",
+  "betAmount": 0.80,
+  "winAmount": 0.40,
+  "spinId": "uuid",
+  "sessionId": "session-token",
+  "currency": "BRL",
+  "gameFeeAmount": 0,
+  "clientFeeAmount": 0,
+  "gameFeePct": 0,
+  "clientFeePct": 0
+}
+
+→ { "ok": true, "balanceBefore": 11000, "balanceAfter": 10999.60 }</code></pre>
+      <ul>
+        <li>Aposta: <code>betAmount</code> maior que zero, <code>winAmount</code> zero → debitar a aposta.</li>
+        <li>Prêmio ou estorno: <code>betAmount</code> zero, <code>winAmount</code> maior que zero → creditar. Isso é válido. Não recusem bet 0 se houver prêmio.</li>
+        <li>Sem saldo: <code>{ "ok": false, "error": "Insufficient balance", "balanceBefore": …, "balanceAfter": … }</code></li>
+        <li>O mesmo <code>spinId</code> não pode debitar duas vezes.</li>
+      </ul>
+
+      <h2>Checklist</h2>
+      <table>
+        <thead><tr><th>Item</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>API Key guardada</td><td></td></tr>
+          <tr><td>walletUrl HTTPS público (não localhost)</td><td></td></tr>
+          <tr><td><code>/balance</code> e <code>/spin</code> com HMAC</td><td></td></tr>
+          <tr><td>Listar jogos e abrir com o ID real do jogador</td><td></td></tr>
+          <tr><td>iframe com CSP liberado</td><td></td></tr>
+          <tr><td>Teste primeiro em <code>/uni/test/…</code>; produção em <code>/uni/live/…</code></td><td></td></tr>
+        </tbody>
+      </table>
+
+      <footer>Uni · guia do cassino · rggames.site/docs/uni/cliente.html</footer>
+    </main>
+  </div>
+</body>
+</html>

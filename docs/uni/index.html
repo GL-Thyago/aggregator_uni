@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Uni — Documentação</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <div class="brand">Uni</div>
+      <div class="tag">Aggregator</div>
+      <nav>
+        <a class="active" href="/docs/uni/">Início</a>
+        <a href="/docs/uni/interno.html">Guia interno</a>
+        <a href="/docs/uni/cliente.html">Guia do cassino</a>
+      </nav>
+      <a class="dl" href="/docs/uni/download/interno.md">Baixar guia interno (.md)</a>
+      <a class="dl" href="/docs/uni/download/cliente.md">Baixar guia do cassino (.md)</a>
+    </aside>
+    <main>
+      <h1>Documentação Uni</h1>
+      <p class="lede">Há dois guias. O interno é para quem opera a Uni e a Salsa. O do cassino é o que você envia ao cliente — ele não precisa saber que existe Salsa.</p>
+
+      <div class="cards">
+        <a class="card" href="/docs/uni/interno.html">
+          <h2>Guia interno</h2>
+          <p>O que a Uni faz, como fala com a Salsa, publisher, teste GPI, ambiente test e live.</p>
+          <span class="go">Abrir guia interno →</span>
+        </a>
+        <a class="card" href="/docs/uni/cliente.html">
+          <h2>Guia do cassino</h2>
+          <p>Como o cliente autentica, lista jogos, abre o jogo e implementa o wallet. Sem Salsa.</p>
+          <span class="go">Abrir guia do cassino →</span>
+        </a>
+      </div>
+
+      <div class="actions">
+        <a href="/docs/uni/download/interno.md">Baixar interno (Markdown)</a>
+        <a href="/docs/uni/download/cliente.md">Baixar cliente (Markdown)</a>
+        <a class="ghost" href="/docs/uni/download/interno.html">Baixar interno (HTML)</a>
+        <a class="ghost" href="/docs/uni/download/cliente.html">Baixar cliente (HTML)</a>
+      </div>
+
+      <h2>Onde está no ar</h2>
+      <p>Local: <code>http://localhost:3010/docs/uni/</code></p>
+      <p>Produção: <code>https://rggames.site/docs/uni/</code></p>
+
+      <footer>Uni · rggames.site</footer>
+    </main>
+  </div>
+</body>
+</html>

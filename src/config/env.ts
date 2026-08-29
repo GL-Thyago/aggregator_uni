@@ -22,6 +22,8 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "1" || v === "true"),
   SALSA_PN: z.string().optional(),
+  /** PN de produção Salsa (rota Uni Live). Teste usa SALSA_PN. */
+  SALSA_PN_LIVE: z.string().optional(),
   SALSA_HASH_KEY: z.string().optional(),
   SALSA_GAME_LIST_URL: z.string().optional(),
   SALSA_API_BASE: z.string().default("https://api-test.salsagator.com"),

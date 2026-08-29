@@ -4,6 +4,7 @@ import { generateSessionToken } from "../lib/utils.js";
 import { buildLaunchUrl, isExternalLaunchGame } from "./game.service.js";
 import { env } from "../config/env.js";
 import { buildSalsaLaunchUrl, isLocalHostname, salsaPublisherUrl } from "../config/salsa.js";
+import { UNI_SALSA, uniPn, type UniEnvironment } from "../config/uni.js";
 import { resolveSpinFees } from "./fee.service.js";
 import { resolveClientGameFees } from "./client-game-fees.service.js";
 import { debitBet, creditWin, getWalletBalance } from "./player-wallet.service.js";
@@ -19,6 +20,7 @@ export async function createGameSession(input: {
   gameId: number;
   externalUserId: string;
   currency?: string;
+  environment?: UniEnvironment;
 }): Promise<GameLaunchPayload> {
   const [game, client] = await Promise.all([
     prisma.game.findUnique({
@@ -76,6 +78,7 @@ export async function createGameSession(input: {
   const apiBridge = `${env.PUBLIC_BASE_URL}/api/v1/game/${sessionToken}`;
   const gpiValidation =
     game.slug === "gpi-validation" || game.externalGameId === "gpi-validation";
+  const salsaEnv = input.environment ? UNI_SALSA[input.environment] : null;
   const launchUrl = isExternal
     ? buildSalsaLaunchUrl({
         token: sessionToken,
@@ -83,6 +86,13 @@ export async function createGameSession(input: {
         openurl: gpiValidation ? null : game.externalUrl,
         currency,
         lang: "pt",
+        ...(salsaEnv
+          ? {
+              apiBase: salsaEnv.apiBase,
+              type: salsaEnv.launchType,
+              pn: uniPn(salsaEnv.id),
+            }
+          : {}),
       })
     : `${buildLaunchUrl(game)}?sessionToken=${sessionToken}&apiUrl=${encodeURIComponent(apiBridge)}`;
 

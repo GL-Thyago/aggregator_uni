@@ -10,6 +10,7 @@ import metaRoutes from "./routes/meta.routes.js";
 import walletRoutes from "./routes/wallet.routes.js";
 import gamePlayRoutes, { handlePlayRequest } from "./routes/game-play.routes.js";
 import salsaRoutes from "./routes/salsa.routes.js";
+import uniRoutes from "./routes/uni.routes.js";
 
 export function createRestServer(): express.Application {
   const app = express();
@@ -18,8 +19,29 @@ export function createRestServer(): express.Application {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  app.use("/admin-panel", express.static(path.join(process.cwd(), "admin"), { index: "index.html" }));
-  app.use("/aggregator-adm", express.static(path.join(process.cwd(), "aggregator_adm"), { index: "index.html" }));
+  const docsUni = path.join(process.cwd(), "docs", "uni");
+  app.get("/docs/uni/download/:file", (req, res) => {
+    const allowed: Record<string, { disk: string; name: string }> = {
+      "interno.md": { disk: "interno.md", name: "uni-guia-interno.md" },
+      "cliente.md": { disk: "cliente.md", name: "uni-guia-cliente.md" },
+      "interno.html": { disk: "interno.html", name: "uni-guia-interno.html" },
+      "cliente.html": { disk: "cliente.html", name: "uni-guia-cliente.html" },
+    };
+    const entry = allowed[String(req.params.file)];
+    if (!entry) {
+      res.status(404).json({ error: "Arquivo não encontrado" });
+      return;
+    }
+    res.download(path.join(docsUni, entry.disk), entry.name, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: "Arquivo não encontrado" });
+    });
+  });
+  app.use("/docs/uni", express.static(docsUni, { index: "index.html" }));
+  app.use("/docs/unime", express.static(docsUni, { index: "index.html" }));
+  app.get(["/uni", "/unime", "/docs"], (_req, res) => {
+    res.redirect(302, "/docs/uni/");
+  });
+
 
   /** Compat: jogos Construct3 simple-php ainda chamam POST .../api/index.php (cache SW antigo) */
   app.post("/games/:slug/api/index.php", (req, res, next) => {
@@ -50,6 +72,7 @@ export function createRestServer(): express.Application {
 
   app.use("/api/v1", metaRoutes);
   app.use("/api/v1", salsaRoutes);
+  app.use("/api/v1", uniRoutes);
   app.use("/api/v1", apiRoutes);
   app.use("/api/v1", walletRoutes);
   app.use("/api/v1", gamePlayRoutes);

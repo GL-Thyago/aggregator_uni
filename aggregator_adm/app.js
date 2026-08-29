@@ -70,12 +70,13 @@ function setView(name) {
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
-  const titles = { dashboard: "Dashboard", clients: "Clientes", revenue: "Receita / Repasse", integrations: "Integrações", rtp: "RTP" };
+  const titles = { dashboard: "Dashboard", clients: "Clientes", revenue: "Receita / Repasse", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
   $("#view-title").textContent = titles[name] || name;
   if (name === "dashboard") loadDashboard();
   if (name === "clients") loadClientsView();
   if (name === "revenue") loadRevenueView();
   if (name === "integrations") loadIntegrationsView();
+  if (name === "highlights") loadHighlightsView();
   if (name === "rtp") loadRtpView();
 }
 
@@ -478,6 +479,52 @@ ${salsa.publisherWarning ? `\n# ATENÇÃO: ${salsa.publisherWarning}` : ""}
   }
 }
 
+async function loadHighlightsView() {
+  showError("");
+  try {
+    await loadMeta();
+    const games = [...state.games].sort((a, b) => {
+      if (Boolean(b.isFeatured) !== Boolean(a.isFeatured)) return b.isFeatured ? 1 : -1;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
+
+    if (!games.length) {
+      $("#highlights-table").innerHTML = "<p class='hint'>Nenhum jogo cadastrado.</p>";
+      return;
+    }
+
+    $("#highlights-table").innerHTML = `<table>
+      <thead><tr>
+        <th>Top</th><th>Jogo</th><th>Provedor</th><th>Destaque</th><th>Ordem</th><th></th>
+      </tr></thead>
+      <tbody>${games.map((g, index) => `
+        <tr data-game-id="${g.id}">
+          <td class="num">${g.isFeatured && index < 10 ? index + 1 : "—"}</td>
+          <td><strong>${g.name}</strong><br><small>${g.slug}</small></td>
+          <td>${g.provider?.name || "—"}</td>
+          <td><input type="checkbox" class="hl-featured" ${g.isFeatured ? "checked" : ""}></td>
+          <td><input class="rate-input hl-order" type="number" step="1" value="${g.sortOrder ?? 0}"></td>
+          <td><button class="ghost btn-save-highlight">Salvar</button></td>
+        </tr>`).join("")}
+      </tbody></table>`;
+
+    $$(".btn-save-highlight").forEach((btn) => btn.addEventListener("click", async () => {
+      const row = btn.closest("tr");
+      const id = row.dataset.gameId;
+      const isFeatured = row.querySelector(".hl-featured").checked;
+      const sortOrder = Number(row.querySelector(".hl-order").value);
+      await api(`/games/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isFeatured, sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0 }),
+      });
+      await loadMeta();
+      loadHighlightsView();
+    }));
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
 async function loadRtpView() {
   showError("");
   try {
@@ -541,6 +588,8 @@ function initUi() {
     const active = $(".nav.active")?.dataset.view;
     if (active) setView(active);
   });
+
+  $("#btn-highlights-refresh")?.addEventListener("click", loadHighlightsView);
 
   $("#btn-salsa-sync").addEventListener("click", async () => {
     showError("");

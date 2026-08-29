@@ -310,6 +310,7 @@ router.patch("/games/:id", async (req, res) => {
     minBet: z.number().min(0).nullable().optional(),
     maxBet: z.number().min(0).nullable().optional(),
     isActive: z.boolean().optional(),
+    isFeatured: z.boolean().optional(),
     name: z.string().min(2).optional(),
     sortOrder: z.number().int().optional(),
     aggregatorFeePct: z.number().min(0).max(50).optional(),

@@ -49,13 +49,15 @@ export function buildSalsaLaunchUrl(input: {
   currency?: string;
   type?: "CHARGED" | "FREE";
   openurl?: string | null;
+  apiBase?: string;
+  pn?: string;
 }): string {
-  const pn = env.SALSA_PN;
+  const pn = input.pn || env.SALSA_PN;
   if (!pn) {
     throw new Error("SALSA_PN não configurado — adicione no .env quando receber da Salsa");
   }
 
-  const base = env.SALSA_API_BASE.replace(/\/$/, "");
+  const base = (input.apiBase ?? env.SALSA_API_BASE).replace(/\/$/, "");
   const url = new URL(`${base}/game`);
   const gameCode = salsaGameCodeFromOpenUrl(input.openurl) ?? input.gameCode.trim();
   url.searchParams.set("token", input.token);

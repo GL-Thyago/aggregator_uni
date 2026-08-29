@@ -8,7 +8,14 @@ export interface RouteInfo {
 }
 
 export const API_ROUTES: RouteInfo[] = [
-  { method: "GET", path: "/api/v1/health", auth: "none", description: "Health check" },
+  { method: "GET", path: "/docs/uni", auth: "none", description: "Documentação Uni (interno e cliente)" },
+  { method: "GET", path: "/docs/uni/download/interno.md", auth: "none", description: "Baixar guia interno (Markdown)" },
+  { method: "GET", path: "/docs/uni/download/cliente.md", auth: "none", description: "Baixar guia do cassino (Markdown)" },
+  { method: "GET", path: "/api/v1/uni", auth: "none", description: "Ambientes Uni (test + live)" },
+  { method: "GET", path: "/api/v1/uni/test", auth: "none", description: "Uni Test — launch Salsa staging" },
+  { method: "GET", path: "/api/v1/uni/live", auth: "none", description: "Uni Live — launch Salsa produção" },
+  { method: "POST", path: "/api/v1/uni/test/games/:slug/launch", auth: "client", description: "Abrir jogo no ambiente de teste" },
+  { method: "POST", path: "/api/v1/uni/live/games/:slug/launch", auth: "client", description: "Abrir jogo no ambiente de produção" },
   { method: "GET", path: "/api/v1/routes", auth: "none", description: "Lista de rotas disponíveis" },
   { method: "POST", path: "/api/v1/auth/token", auth: "none", description: "Login com API Key → JWT" },
   { method: "POST", path: "/api/v1/auth/refresh", auth: "none", description: "Renovar access token" },

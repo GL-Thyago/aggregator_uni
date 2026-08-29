@@ -29,6 +29,7 @@
         <button data-view="clients" class="nav">Clientes</button>
         <button data-view="revenue" class="nav">Receita / Repasse</button>
         <button data-view="integrations" class="nav">Integrações</button>
+        <button data-view="highlights" class="nav">Top 10 / Destaques</button>
         <button data-view="rtp" class="nav">RTP</button>
       </nav>
       <div class="sidebar-foot">
@@ -190,6 +191,17 @@
           <h3>Provedores — ligue/desligue PG, Salsa, etc.</h3>
           <p class="hint">Desativar um provedor oculta todos os jogos dele para os operadores. Use cascade para desativar os jogos também.</p>
           <div class="table-wrap" id="providers-table"></div>
+        </div>
+      </section>
+
+      <section id="view-highlights" class="view hidden">
+        <div class="panel">
+          <h3>Top 10 do cassino</h3>
+          <p class="hint">Marque <strong>Destaque</strong> e defina <strong>Ordem</strong> (1 = primeiro). Os 10 primeiros destaques aparecem no carrossel do site.</p>
+          <div class="inline-form">
+            <button id="btn-highlights-refresh" class="ghost">Atualizar lista</button>
+          </div>
+          <div class="table-wrap" id="highlights-table"></div>
         </div>
       </section>
 

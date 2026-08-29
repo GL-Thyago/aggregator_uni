@@ -139,6 +139,7 @@ router.get("/sync/games", authMiddleware, async (req: AuthenticatedRequest, res)
 const launchSchema = z.object({
   externalUserId: z.string().min(1),
   currency: z.string().default("BRL"),
+  environment: z.enum(["test", "live"]).optional(),
 });
 
 router.post("/games/:slug/launch", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -167,6 +168,7 @@ router.post("/games/:slug/launch", authMiddleware, async (req: AuthenticatedRequ
       gameId: game.id,
       externalUserId: parsed.data.externalUserId,
       currency: parsed.data.currency,
+      environment: parsed.data.environment,
     });
     res.json(launch);
   } catch (err) {

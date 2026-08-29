@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Uni — Guia interno</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <div class="brand">Uni</div>
+      <div class="tag">Guia interno</div>
+      <nav>
+        <a href="/docs/uni/">Início</a>
+        <a class="active" href="/docs/uni/interno.html">Guia interno</a>
+        <a href="/docs/uni/cliente.html">Guia do cassino</a>
+      </nav>
+      <a class="dl" href="/docs/uni/download/interno.md">Baixar este guia (.md)</a>
+      <a class="dl" href="/docs/uni/download/interno.html">Baixar este guia (.html)</a>
+    </aside>
+    <main>
+      <h1>O que a Uni faz</h1>
+      <p class="lede">A Uni é o aggregator. Os cassinos falam só com você. A Salsa fala só com você. Os cassinos não conhecem a Salsa.</p>
+
+      <div class="actions">
+        <a href="/docs/uni/download/interno.md">Baixar Markdown</a>
+        <a class="ghost" href="/docs/uni/download/interno.html">Baixar HTML</a>
+      </div>
+
+      <h2>Peças</h2>
+      <table>
+        <thead><tr><th>Peça</th><th>Papel</th></tr></thead>
+        <tbody>
+          <tr><td>Cassino (cliente Uni)</td><td>Tem os jogadores e o saldo. Chama a API Uni. Expõe o wallet.</td></tr>
+          <tr><td>Uni (este sistema)</td><td>Catálogo, sessão, launch, publisher XML, débito no wallet certo.</td></tr>
+          <tr><td>Salsa</td><td>Estúdio dos jogos. Abre o iframe e, na aposta, chama o publisher da Uni.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Como a comunicação funciona</h2>
+      <div class="flow">1. Cassino → Uni
+   POST /api/v1/uni/test/games/{slug}/launch
+   (API Key + ID do jogador)
+
+2. Uni cria uma sessão (token UUID)
+   e devolve launchUrl da Salsa.
+
+3. Cassino abre launchUrl no iframe.
+   O jogador está na Salsa, com o token da Uni.
+
+4. Salsa → Uni
+   POST /api/v1/salsa/publisher  (XML)
+   GetAccountDetails, GetBalance,
+   PlaceBet, AwardWinnings, RefundBet…
+
+5. Uni → wallet do cassino daquela sessão
+   POST {walletUrl}/balance
+   POST {walletUrl}/spin</div>
+
+      <div class="callout">
+        Um aggregator. Vários cassinos. Cada cliente Uni tem o <strong>próprio</strong> <code>walletUrl</code>. A sessão guarda o cliente: aposta do cassino A nunca cai no wallet do cassino B.
+      </div>
+
+      <h2>URL que a Salsa deve ter cadastrada</h2>
+      <p>Um publisher, test e live. A Salsa sempre chama:</p>
+<pre><code>https://rggames.site/api/v1/salsa/publisher</code></pre>
+      <p>Não dê essa URL ao cassino. É só para a Salsa.</p>
+
+      <h2>Test e live</h2>
+      <p>Não são dois aggregators. São dois destinos de <strong>abertura de jogo</strong> na Salsa.</p>
+      <table>
+        <thead><tr><th></th><th>Test</th><th>Live</th></tr></thead>
+        <tbody>
+          <tr><td>Rota Uni</td><td><code>POST /api/v1/uni/test/games/{slug}/launch</code></td><td><code>POST /api/v1/uni/live/games/{slug}/launch</code></td></tr>
+          <tr><td>Host Salsa</td><td><code>api-test.salsagator.com</code></td><td><code>api.salsagator.com</code></td></tr>
+          <tr><td>Catálogo</td><td><code>back-test.patagoniaentertainment.com</code></td><td><code>back.patagoniaentertainment.com</code></td></tr>
+          <tr><td>type=</td><td>FREE</td><td>CHARGED</td></tr>
+          <tr><td>PN</td><td><code>SALSA_PN</code> (hoje: rg-games-staging)</td><td><code>SALSA_PN_LIVE</code> (PN de produção, quando a Salsa enviar)</td></tr>
+        </tbody>
+      </table>
+      <p>O PN de staging <strong>não existe</strong> no host de produção. Live só depois do PN novo.</p>
+      <p>Ver o que está configurado: <code>GET /api/v1/uni/test</code> e <code>GET /api/v1/uni/live</code>.</p>
+
+      <h2>Teste GPI (certificação Salsa)</h2>
+      <p>Ferramenta da Salsa que bate no publisher e valida saldo, aposta, prêmio, reembolso, hash e token.</p>
+      <ol>
+        <li>Wallet do cassino público (nunca <code>localhost</code> no servidor).</li>
+        <li>Jogador de teste com saldo.</li>
+        <li>Launch:</li>
+      </ol>
+<pre><code>POST https://rggames.site/api/v1/uni/test/games/gpi-validation/launch
+X-Api-Key: sua-api-key
+
+{ "externalUserId": "ID_DO_JOGADOR", "currency": "BRL" }</code></pre>
+      <p>A resposta traz <code>gpiUrl</code>. Abra no browser. Ou:</p>
+<pre><code>https://gpi-validation-test.patagoniaentertainment.com/gpi-validation/execute
+  ?token={sessionToken}
+  &amp;type=CHARGED
+  &amp;lang=pt
+  &amp;pn={SALSA_PN}
+  &amp;game=gpi-validation</code></pre>
+      <p>Se um case falhar: <code>GET /admin/v1/integrations/salsa/last-request</code> com <code>X-Admin-Key</code>.</p>
+      <p>O wallet tem de aceitar crédito só de prêmio: <code>betAmount = 0</code> e <code>winAmount &gt; 0</code>.</p>
+
+      <h2>Env que importa (EasyPanel Uni)</h2>
+      <table>
+        <thead><tr><th>Variável</th><th>Para quê</th></tr></thead>
+        <tbody>
+          <tr><td><code>PUBLIC_BASE_URL</code></td><td><code>https://rggames.site</code></td></tr>
+          <tr><td><code>SALSA_PUBLISHER_URL</code></td><td>publisher acima</td></tr>
+          <tr><td><code>SALSA_PN</code> / <code>SALSA_HASH_KEY</code></td><td>credenciais staging</td></tr>
+          <tr><td><code>SALSA_PN_LIVE</code></td><td>PN produção, quando existir</td></tr>
+          <tr><td><code>SALSA_API_BASE</code></td><td>default se o launch não pedir test/live</td></tr>
+          <tr><td><code>BACK_UNI_WALLET_URL</code></td><td>só se o cliente Uni ainda tiver wallet localhost</td></tr>
+        </tbody>
+      </table>
+      <p><code>BACK_UNI_WALLET_URL=https://b.sorteiobr.com/api/casino/wallet</code> vai no <strong>aggregator</strong>, não no back_uni. É o wallet do SorteioBR. Outro cassino usa o walletUrl dele no admin.</p>
+
+      <h2>O que o cassino recebe</h2>
+      <p>Envie só o <a href="/docs/uni/cliente.html">guia do cassino</a>. Lá não aparece Salsa, PN, XML nem GPI.</p>
+
+      <footer>Uni · guia interno · rggames.site/docs/uni/</footer>
+    </main>
+  </div>
+</body>
+</html>
