@@ -93,11 +93,9 @@ export async function processWalletSpin(
 }
 
 function resolveWalletUrl(walletUrl: string): string {
-  if (!/localhost|127\.0\.0\.1/i.test(walletUrl)) return walletUrl;
-  if (env.BACK_UNI_WALLET_URL) return env.BACK_UNI_WALLET_URL.replace(/\/$/, "");
-  if (env.NODE_ENV === "production") {
-    console.warn(
-      `[Wallet] walletUrl aponta para ${walletUrl}; em produção use BACK_UNI_WALLET_URL (ex. https://b.sorteiobr.com/api/casino/wallet)`,
+  if (/localhost|127\.0\.0\.1/i.test(walletUrl) && env.NODE_ENV === "production") {
+    console.error(
+      `[Wallet] walletUrl deste cliente é localhost. Grave a URL pública no admin Uni (cadastro do cassino), não no .env.`,
     );
   }
   return walletUrl;

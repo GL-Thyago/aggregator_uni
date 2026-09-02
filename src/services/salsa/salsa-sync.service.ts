@@ -316,6 +316,7 @@ export async function hideNonSalsaCatalog() {
     data: { isActive: false },
   });
   await ensureGpiValidationGame();
+  await ensureOssProductionGames();
 }
 
 /** Jogo de certificação GPI da Salsa (`game=gpi-validation`). */
@@ -357,6 +358,119 @@ export async function ensureGpiValidationGame() {
       providerId: provider.id,
     },
   });
+}
+
+const OSS_PRODUCTION_GAMES: Array<{
+  code: string;
+  name: string;
+  providerSlug: string;
+  providerName: string;
+  categorySlug: "table" | "slots";
+  gameType: GameType;
+}> = [
+  {
+    code: "evo-oss-xs-monopoly-live",
+    name: "Monopoly Live",
+    providerSlug: "evolution",
+    providerName: "Evolution",
+    categorySlug: "table",
+    gameType: "TABLE",
+  },
+  {
+    code: "ez-oss-CricketWar",
+    name: "Cricket War",
+    providerSlug: "ezugi",
+    providerName: "Ezugi",
+    categorySlug: "table",
+    gameType: "TABLE",
+  },
+  {
+    code: "net-oss-Quest2ReturntoElDorado",
+    name: "Quest II: Return to El Dorado",
+    providerSlug: "netent",
+    providerName: "NetEnt",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "ret-oss-atlantis",
+    name: "Atlantis",
+    providerSlug: "red-tiger",
+    providerName: "Red Tiger",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "nl-oss-DJPsycho",
+    name: "DJ Psycho",
+    providerSlug: "no-limit-city",
+    providerName: "No Limit City",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+];
+
+/** Jogos do pacote Evolution OSS liberados em produção (OPS-3353). */
+export async function ensureOssProductionGames() {
+  const created: string[] = [];
+
+  for (const item of OSS_PRODUCTION_GAMES) {
+    const provider = await prisma.gameProvider.upsert({
+      where: { slug: item.providerSlug },
+      create: {
+        slug: item.providerSlug,
+        name: item.providerName,
+        integration: "SALSA",
+        isActive: true,
+      },
+      update: { name: item.providerName, integration: "SALSA", isActive: true },
+    });
+
+    const category = await prisma.gameCategory.upsert({
+      where: { slug: item.categorySlug },
+      create: {
+        slug: item.categorySlug,
+        name: item.categorySlug === "table" ? "Mesa" : "Slots",
+        sortOrder: item.categorySlug === "table" ? 2 : 1,
+      },
+      update: {},
+    });
+
+    const existing = await prisma.game.findFirst({
+      where: { OR: [{ slug: item.code }, { externalGameId: item.code }] },
+    });
+
+    if (existing) {
+      await prisma.game.update({
+        where: { id: existing.id },
+        data: {
+          name: item.name,
+          engine: "EXTERNAL",
+          externalGameId: item.code,
+          isActive: true,
+          providerId: provider.id,
+          categoryId: category.id,
+          gameType: item.gameType,
+        },
+      });
+    } else {
+      await prisma.game.create({
+        data: {
+          slug: item.code,
+          name: item.name,
+          providerId: provider.id,
+          categoryId: category.id,
+          gameType: item.gameType,
+          engine: "EXTERNAL",
+          externalGameId: item.code,
+          isActive: true,
+        },
+      });
+      created.push(item.code);
+    }
+  }
+
+  return { count: OSS_PRODUCTION_GAMES.length, created };
 }
 
 export async function syncSalsaGamesFromSource(options?: {
@@ -512,6 +626,7 @@ export async function syncSalsaGamesFromSource(options?: {
 
 /** Ativa o catálogo externo e libera as categorias para os operadores B2B. */
 export async function publishExternalCatalogToClients() {
+  await ensureOssProductionGames();
   await prisma.gameProvider.updateMany({
     where: {
       OR: [{ integration: "SALSA" }, { games: { some: { engine: "EXTERNAL" } } }],

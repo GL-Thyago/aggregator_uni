@@ -45,6 +45,12 @@ enum BillingMode {
   POSTPAID
 }
 
+/// Destino de abertura do jogo deste operador. Não é global no aggregator.
+enum LaunchEnvironment {
+  TEST
+  LIVE
+}
+
 enum ClientWalletTxType {
   FUND
   DEBIT_FEE
@@ -62,6 +68,8 @@ model Client {
   billingMode  BillingMode @default(PREPAID) @map("billing_mode")
   /// Limite de crédito negativo (pós-pago). Null = sem limite explícito.
   maxCredit    Decimal? @map("max_credit") @db.Decimal(18, 2)
+  /// TEST = api-test (homologação). LIVE = produção. Cada cassino escolhe o seu.
+  launchEnvironment LaunchEnvironment @default(TEST) @map("launch_environment")
   /// URL base do wallet no consumidor (ex: https://back_uni_fut/api/casino/wallet)
   walletUrl    String?  @map("wallet_url")
   /// Segredo HMAC para assinar callbacks wallet

@@ -69,7 +69,8 @@ function recordPublisherTrace(xml: string, method: string, token: string | undef
 }
 
 function checkSalsaHash(paramsValue: string, hash: string): boolean {
-  return validateSalsaHash(paramsValue, hash, activeHashKey);
+  if (activeHashKey && validateSalsaHash(paramsValue, hash, activeHashKey)) return true;
+  return validateSalsaHash(paramsValue, hash);
 }
 
 async function loadSessionByToken(token: string) {
@@ -748,7 +749,7 @@ export async function handleSalsaPublisherRequest(xml: string): Promise<string> 
     return salsaFailure("Unknown", "Salsa integration disabled.", "9000");
   }
 
-  if (!cfg.hashKey) {
+  if (!cfg.hashKey && !process.env.SALSA_HASH_KEY_LIVE) {
     return salsaFailure("Unknown", "SALSA_HASH_KEY not configured.", "9001");
   }
 

@@ -10,6 +10,7 @@ export interface GameLaunchPayload {
   sessionToken: string;
   gameSlug: string;
   launchUrl: string;
+  environment: "test" | "live";
   expiresAt: string;
   balance: number;
   warning?: string;

@@ -1,6 +1,8 @@
 import express from "express";
 import type { Server } from "node:http";
+import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import { env } from "../../config/env.js";
 import { resolveGamesDir } from "../../services/game.service.js";
@@ -12,6 +14,17 @@ import gamePlayRoutes, { handlePlayRequest } from "./routes/game-play.routes.js"
 import salsaRoutes from "./routes/salsa.routes.js";
 import uniRoutes from "./routes/uni.routes.js";
 
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function sendIndex(dirName: string, res: express.Response) {
+  const index = path.join(repoRoot, dirName, "index.html");
+  if (!fs.existsSync(index)) {
+    res.status(404).type("text/plain").send(`Não achei ${dirName}/index.html em ${repoRoot}`);
+    return;
+  }
+  res.sendFile(index);
+}
+
 export function createRestServer(): express.Application {
   const app = express();
 
@@ -19,7 +32,7 @@ export function createRestServer(): express.Application {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  const docsUni = path.join(process.cwd(), "docs", "uni");
+  const docsUni = path.join(repoRoot, "docs", "uni");
   app.get("/docs/uni/download/:file", (req, res) => {
     const allowed: Record<string, { disk: string; name: string }> = {
       "interno.md": { disk: "interno.md", name: "uni-guia-interno.md" },
@@ -42,6 +55,12 @@ export function createRestServer(): express.Application {
     res.redirect(302, "/docs/uni/");
   });
 
+  app.get("/aggregator-adm", (_req, res) => sendIndex("aggregator_adm", res));
+  app.get("/aggregator-adm/", (_req, res) => sendIndex("aggregator_adm", res));
+  app.use("/aggregator-adm", express.static(path.join(repoRoot, "aggregator_adm")));
+  app.get("/admin-panel", (_req, res) => sendIndex("admin", res));
+  app.get("/admin-panel/", (_req, res) => sendIndex("admin", res));
+  app.use("/admin-panel", express.static(path.join(repoRoot, "admin")));
 
   /** Compat: jogos Construct3 simple-php ainda chamam POST .../api/index.php (cache SW antigo) */
   app.post("/games/:slug/api/index.php", (req, res, next) => {
@@ -106,8 +125,8 @@ export function startRestServer(): void {
     console.log(`[REST] Casino Aggregator running on http://localhost:${env.PORT}`);
     console.log(`[REST] API:  http://localhost:${env.PORT}/api/v1`);
     console.log(`[REST] Admin API: http://localhost:${env.PORT}/admin/v1`);
-    console.log(`[REST] Admin UI:  http://localhost:${env.PORT}/admin-panel/`);
-    console.log(`[REST] Aggregator ADM: http://localhost:${env.PORT}/aggregator-adm/`);
+    console.log(`[REST] Admin UI:  http://localhost:${env.PORT}/admin-panel/  (${path.join(repoRoot, "admin")})`);
+    console.log(`[REST] Aggregator ADM: http://localhost:${env.PORT}/aggregator-adm/  (${path.join(repoRoot, "aggregator_adm")})`);
     console.log(`[REST] Salsa Publisher: http://localhost:${env.PORT}/api/v1/salsa/publisher`);
     console.log(`[REST] Games: http://localhost:${env.PORT}/games/ (dir: ${path.resolve(env.GAMES_DIR)})`);
     void import("../../services/salsa/salsa-sync.service.js")

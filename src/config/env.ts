@@ -21,11 +21,14 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "1" || v === "true"),
+  /** PN Salsa de teste (staging). */
   SALSA_PN: z.string().optional(),
-  /** PN de produção Salsa (rota Uni Live). Teste usa SALSA_PN. */
-  SALSA_PN_LIVE: z.string().optional(),
   SALSA_HASH_KEY: z.string().optional(),
   SALSA_GAME_LIST_URL: z.string().optional(),
+  /** PN / hash / catálogo Salsa de produção. Cada cassino escolhe TEST ou LIVE no admin. */
+  SALSA_PN_LIVE: z.string().optional(),
+  SALSA_HASH_KEY_LIVE: z.string().optional(),
+  SALSA_GAME_LIST_URL_LIVE: z.string().optional(),
   SALSA_API_BASE: z.string().default("https://api-test.salsagator.com"),
   /** CHARGED = dinheiro real. Staging da Salsa costuma ter CHARGED desligado — use FREE. */
   SALSA_LAUNCH_TYPE: z.enum(["CHARGED", "FREE", "omit"]).optional(),
@@ -39,8 +42,6 @@ const envSchema = z.object({
   /** URL pública que a Salsa chama (túnel/produção). Sem isso, localhost gera Communication error. */
   SALSA_PUBLISHER_URL: z.string().optional(),
   SALSA_DEFAULT_COST_PCT: z.coerce.number().default(6.5),
-  /** Wallet do cassino (back_uni). Se o cliente ainda tiver localhost, produção usa este URL. */
-  BACK_UNI_WALLET_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

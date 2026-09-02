@@ -65,15 +65,14 @@ X-Api-Key: ca_...</code></pre>
 
       <h2>2. Abrir um jogo</h2>
       <p><code>externalUserId</code> é o ID do jogador <strong>no vosso cassino</strong>. A Uni usa esse ID em todo movimento de saldo.</p>
-      <p>Teste (homologação):</p>
-<pre><code>POST https://rggames.site/api/v1/uni/test/games/{slug}/launch
+      <p>A Uni configura se a vossa conta está em <strong>teste</strong> ou <strong>produção</strong>. Vocês usam sempre a mesma rota:</p>
+<pre><code>POST https://rggames.site/api/v1/games/{slug}/launch
 X-Api-Key: ca_...
 Content-Type: application/json
 
 { "externalUserId": "20419622", "currency": "BRL" }</code></pre>
-      <p>Produção (dinheiro real):</p>
-<pre><code>POST https://rggames.site/api/v1/uni/live/games/{slug}/launch
-...</code></pre>
+      <p>O <code>slug</code> pode ser o código do jogo (ex. <code>evo-oss-xs-monopoly-live</code>). A resposta inclui <code>environment</code> (<code>test</code> ou <code>live</code>) e a <code>launchUrl</code>.</p>
+      <p>Não misturem contas: um cassino em produção continua em produção se outro cassino estiver em teste.</p>
       <p>Resposta:</p>
 <pre><code>{
   "sessionToken": "uuid",
@@ -142,7 +141,7 @@ Content-Type: application/json
           <tr><td><code>/balance</code> e <code>/spin</code> com HMAC</td><td></td></tr>
           <tr><td>Listar jogos e abrir com o ID real do jogador</td><td></td></tr>
           <tr><td>iframe com CSP liberado</td><td></td></tr>
-          <tr><td>Teste primeiro em <code>/uni/test/…</code>; produção em <code>/uni/live/…</code></td><td></td></tr>
+          <tr><td>A Uni marcou a vossa conta como teste ou produção</td><td></td></tr>
         </tbody>
       </table>
 

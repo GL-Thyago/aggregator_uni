@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import { env } from "./env.js";
 
 export function isSalsaConfigured(): boolean {
-  return Boolean(env.SALSA_PN && env.SALSA_HASH_KEY);
+  const hasPn = Boolean(env.SALSA_PN || env.SALSA_PN_LIVE);
+  const hasHash = Boolean(env.SALSA_HASH_KEY || env.SALSA_HASH_KEY_LIVE);
+  return hasPn && hasHash;
 }
 
 export function isLocalHostname(url: string): boolean {
@@ -66,9 +68,11 @@ export function buildSalsaLaunchUrl(input: {
   url.searchParams.set("game", gameCode);
 
   const launchType =
-    env.SALSA_LAUNCH_TYPE ?? (isSalsaTestApi(base) ? "FREE" : "CHARGED");
+    input.type ??
+    env.SALSA_LAUNCH_TYPE ??
+    (isSalsaTestApi(base) ? "FREE" : "CHARGED");
   if (launchType !== "omit") {
-    url.searchParams.set("type", input.type ?? launchType);
+    url.searchParams.set("type", launchType);
   }
   if (!isSalsaTestApi(base) && input.currency) {
     url.searchParams.set("currency", input.currency);
@@ -82,10 +86,11 @@ export function salsaHash(paramsValue: string, hashKey = env.SALSA_HASH_KEY ?? "
 }
 
 export function validateSalsaHash(paramsValue: string, hash: string, hashKey?: string): boolean {
-  const key = hashKey ?? env.SALSA_HASH_KEY;
-  if (!key || !hash) return false;
-  const expected = salsaHash(paramsValue, key);
-  return expected.toLowerCase() === hash.toLowerCase();
+  if (!hash) return false;
+  const keys = hashKey
+    ? [hashKey]
+    : [env.SALSA_HASH_KEY, env.SALSA_HASH_KEY_LIVE].filter((k): k is string => Boolean(k));
+  return keys.some((key) => salsaHash(paramsValue, key).toLowerCase() === hash.toLowerCase());
 }
 
 export function extTransactionNum(seed: string): bigint {

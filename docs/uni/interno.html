@@ -67,7 +67,11 @@
 <pre><code>https://rggames.site/api/v1/salsa/publisher</code></pre>
       <p>Não dê essa URL ao cassino. É só para a Salsa.</p>
 
-      <h2>Test e live</h2>
+      <h2>Test e live (por cassino, não no .env)</h2>
+      <p>O ambiente fica no <strong>cadastro do cliente</strong> (admin Uni: Teste ou Produção). Um cassino em live não muda quando outro usa teste. <code>SALSA_API_BASE</code> / <code>SALSA_LAUNCH_TYPE</code> no .env não mandam mais no launch.</p>
+      <p>O cassino chama <code>POST /api/v1/games/{slug}/launch</code>. A Uni monta a URL Salsa certa para <em>aquele</em> cliente.</p>
+      <p>Rotas explícitas (staff / debug): <code>/api/v1/uni/test/…</code> e <code>/api/v1/uni/live/…</code>.</p>
+      <h2>Test e live (hosts Salsa)</h2>
       <p>Não são dois aggregators. São dois destinos de <strong>abertura de jogo</strong> na Salsa.</p>
       <table>
         <thead><tr><th></th><th>Test</th><th>Live</th></tr></thead>
@@ -116,6 +120,16 @@ X-Api-Key: sua-api-key
         </tbody>
       </table>
       <p><code>BACK_UNI_WALLET_URL=https://b.sorteiobr.com/api/casino/wallet</code> vai no <strong>aggregator</strong>, não no back_uni. É o wallet do SorteioBR. Outro cassino usa o walletUrl dele no admin.</p>
+
+      <h2>Colocar jogos em produção (ex. OPS-3353)</h2>
+      <ol>
+        <li>A Salsa libera o pacote no PN de <strong>produção</strong> (não é o aggregator que “cadastra” no estúdio).</li>
+        <li>Na Uni, no boot ou em Publicar catálogo, os IDs entram no banco (ex. <code>evo-oss-xs-monopoly-live</code>). O endpoint de catálogo da Salsa traz o resto.</li>
+        <li>No admin, o cassino que vai validar dinheiro real fica em <strong>Produção</strong>.</li>
+        <li>Esse cassino abre o jogo com <code>POST /api/v1/games/evo-oss-xs-monopoly-live/launch</code>.</li>
+        <li>Logs: publisher <code>GET /admin/v1/integrations/salsa/last-request</code> e logs do EasyPanel.</li>
+      </ol>
+      <p>Sem PN de produção (<code>SALSA_PN_LIVE</code>), o launch live usa o PN de staging no host de produção e a Salsa responde “Non Existent Publisher”.</p>
 
       <h2>O que o cassino recebe</h2>
       <p>Envie só o <a href="/docs/uni/cliente.html">guia do cassino</a>. Lá não aparece Salsa, PN, XML nem GPI.</p>

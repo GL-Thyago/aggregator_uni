@@ -140,8 +140,11 @@ export async function syncGamesForClient(clientId: string): Promise<SyncGamesRes
 }
 
 export async function getGameBySlug(slug: string) {
-  return prisma.game.findUnique({
-    where: { slug },
-    include: { category: true, provider: true },
+  const include = { category: true, provider: true } as const;
+  const bySlug = await prisma.game.findUnique({ where: { slug }, include });
+  if (bySlug) return bySlug;
+  return prisma.game.findFirst({
+    where: { externalGameId: slug, isActive: true },
+    include,
   });
 }

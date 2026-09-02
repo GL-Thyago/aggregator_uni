@@ -29,7 +29,7 @@ export async function createGameSession(input: {
     }),
     prisma.client.findUnique({
       where: { id: input.clientId },
-      select: { marginPct: true },
+      select: { marginPct: true, launchEnvironment: true },
     }),
   ]);
 
@@ -78,7 +78,9 @@ export async function createGameSession(input: {
   const apiBridge = `${env.PUBLIC_BASE_URL}/api/v1/game/${sessionToken}`;
   const gpiValidation =
     game.slug === "gpi-validation" || game.externalGameId === "gpi-validation";
-  const salsaEnv = input.environment ? UNI_SALSA[input.environment] : null;
+  const environment: UniEnvironment =
+    input.environment ?? (client.launchEnvironment === "LIVE" ? "live" : "test");
+  const salsaEnv = UNI_SALSA[environment];
   const launchUrl = isExternal
     ? buildSalsaLaunchUrl({
         token: sessionToken,
@@ -86,13 +88,9 @@ export async function createGameSession(input: {
         openurl: gpiValidation ? null : game.externalUrl,
         currency,
         lang: "pt",
-        ...(salsaEnv
-          ? {
-              apiBase: salsaEnv.apiBase,
-              type: salsaEnv.launchType,
-              pn: uniPn(salsaEnv.id),
-            }
-          : {}),
+        apiBase: salsaEnv.apiBase,
+        type: salsaEnv.launchType,
+        pn: uniPn(salsaEnv.id),
       })
     : `${buildLaunchUrl(game)}?sessionToken=${sessionToken}&apiUrl=${encodeURIComponent(apiBridge)}`;
 
@@ -107,6 +105,7 @@ export async function createGameSession(input: {
     sessionToken,
     gameSlug: game.slug,
     launchUrl,
+    environment,
     expiresAt: expiresAt.toISOString(),
     balance,
     warning,

@@ -31,20 +31,14 @@ Usem o `slug`. Capa: `GET /api/v1/media/cover/{slug}`. Sync: `GET /api/v1/sync/g
 
 `externalUserId` = ID do jogador no vosso cassino.
 
-Teste:
+A Uni define se a vossa conta é teste ou produção. Uma rota só:
 
 ```
-POST https://rggames.site/api/v1/uni/test/games/{slug}/launch
+POST https://rggames.site/api/v1/games/{slug}/launch
 { "externalUserId": "20419622", "currency": "BRL" }
 ```
 
-Produção:
-
-```
-POST https://rggames.site/api/v1/uni/live/games/{slug}/launch
-```
-
-Abram a `launchUrl` sem alterar. No CSP, `frame-src` deve incluir o domínio dessa URL.
+`slug` pode ser o código do jogo (`evo-oss-xs-monopoly-live`). A resposta traz `environment` e `launchUrl`. Abram a URL sem alterar. No CSP, `frame-src` deve incluir o domínio dessa URL.
 
 ## Wallet
 

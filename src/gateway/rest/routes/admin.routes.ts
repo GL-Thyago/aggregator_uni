@@ -20,6 +20,7 @@ const createClientSchema = z.object({
   rtpPoolMode: z.enum(["GLOBAL", "PER_CLIENT"]).default("GLOBAL"),
   walletUrl: z.string().url().nullable().optional(),
   walletSecret: z.string().min(8).nullable().optional(),
+  launchEnvironment: z.enum(["TEST", "LIVE"]).optional(),
   entitlements: z.array(
     z.object({
       categoryId: z.number().int(),
@@ -51,6 +52,7 @@ router.post("/clients", async (req, res) => {
       rtpPoolMode: parsed.data.rtpPoolMode,
       walletUrl: parsed.data.walletUrl ?? null,
       walletSecret: parsed.data.walletSecret ?? null,
+      launchEnvironment: parsed.data.launchEnvironment ?? "TEST",
       entitlements: {
         create: parsed.data.entitlements.map((e) => ({
           categoryId: e.categoryId,
@@ -246,7 +248,7 @@ const createGameSchema = z.object({
 
 router.patch("/clients/:id", async (req, res) => {
   const clientId = req.params.id!;
-  const { isActive, marginPct, name, walletUrl, walletSecret, rtpPoolMode, billingMode, maxCredit } =
+  const { isActive, marginPct, name, walletUrl, walletSecret, rtpPoolMode, billingMode, maxCredit, launchEnvironment } =
     req.body as {
       isActive?: boolean;
       marginPct?: number;
@@ -256,6 +258,7 @@ router.patch("/clients/:id", async (req, res) => {
       rtpPoolMode?: "GLOBAL" | "PER_CLIENT";
       billingMode?: "PREPAID" | "POSTPAID";
       maxCredit?: number | null;
+      launchEnvironment?: "TEST" | "LIVE";
     };
 
   const client = await prisma.client.update({
@@ -269,6 +272,7 @@ router.patch("/clients/:id", async (req, res) => {
       ...(rtpPoolMode !== undefined && { rtpPoolMode }),
       ...(billingMode !== undefined && { billingMode }),
       ...(maxCredit !== undefined && { maxCredit }),
+      ...(launchEnvironment !== undefined && { launchEnvironment }),
     },
   });
 

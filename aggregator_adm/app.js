@@ -177,11 +177,12 @@ async function loadDashboard() {
 function renderClientsTable() {
   $("#clients-table").innerHTML = `<table>
     <thead><tr>
-      <th>Nome</th><th>Cobrança</th><th>Margem</th><th>Saldo B2B</th><th>Status</th><th></th>
+      <th>Nome</th><th>Ambiente</th><th>Cobrança</th><th>Margem</th><th>Saldo B2B</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>${state.clients.map((c) => `
       <tr>
         <td>${c.name}</td>
+        <td>${c.launchEnvironment === "LIVE" ? "Produção" : "Teste"}</td>
         <td><span class="badge ${c.billingMode === "POSTPAID" ? "postpaid" : "prepaid"}">${c.billingMode === "POSTPAID" ? "Pós-pago" : "Pré-pago"}${c.maxCredit ? ` · limite ${money(c.maxCredit)}` : ""}</span></td>
         <td class="num">${Number(c.marginPct)}%</td>
         <td class="num">${money(c.clientWallet?.balance ?? 0)}</td>
@@ -318,6 +319,7 @@ async function refreshClientDetail() {
     form.maxCredit.value = client.maxCredit ?? "";
     form.initialBalance.value = 0;
     form.rtpPoolMode.value = client.rtpPoolMode;
+    form.launchEnvironment.value = client.launchEnvironment || "TEST";
     form.walletUrl.value = client.walletUrl || "";
     form.walletSecret.value = "";
     form.dataset.editId = client.id;
@@ -690,6 +692,7 @@ function initUi() {
       maxCredit: form.maxCredit.value !== "" ? Number(form.maxCredit.value) : null,
       initialBalance: Number(form.initialBalance.value || 0),
       rtpPoolMode: form.rtpPoolMode.value,
+      launchEnvironment: form.launchEnvironment.value || "TEST",
       walletUrl: form.walletUrl.value || null,
       walletSecret: form.walletSecret.value || null,
       entitlements: readEntitlementsFromForm($("#entitlements-builder")),
@@ -705,6 +708,7 @@ function initUi() {
             maxCredit: body.maxCredit,
             rtpPoolMode: body.rtpPoolMode,
             walletUrl: body.walletUrl,
+            launchEnvironment: body.launchEnvironment,
             ...(body.walletSecret ? { walletSecret: body.walletSecret } : {}),
           }),
         });

@@ -28,6 +28,8 @@ https://rggames.site/api/v1/salsa/publisher
 
 ## Test vs live
 
+O ambiente é **por cassino** (admin: Teste ou Produção), não um .env global. `POST /api/v1/games/{slug}/launch` usa o destino daquele cliente.
+
 Não são dois aggregators. São dois destinos de abertura de jogo.
 
 | | Test | Live |
@@ -49,6 +51,16 @@ POST /api/v1/uni/test/games/gpi-validation/launch
 Abrir o `gpiUrl` da resposta. Wallet público; `betAmount = 0` + `winAmount > 0` tem de creditar.
 
 Falha: `GET /admin/v1/integrations/salsa/last-request` (`X-Admin-Key`).
+
+## Jogos em produção (OPS-3353)
+
+IDs: `evo-oss-xs-monopoly-live`, `ez-oss-CricketWar`, `net-oss-Quest2ReturntoElDorado`, `ret-oss-atlantis`, `nl-oss-DJPsycho`.
+
+1. Salsa libera no PN de produção.
+2. Uni publica o catálogo (IDs entram no banco).
+3. Cliente do cassino em Produção no admin.
+4. Launch: `POST /api/v1/games/{id}/launch`.
+5. Precisa de `SALSA_PN_LIVE`. Sem isso, live no host de produção falha.
 
 ## Env (EasyPanel da Uni)
 
