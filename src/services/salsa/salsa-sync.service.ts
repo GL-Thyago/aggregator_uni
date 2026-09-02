@@ -395,7 +395,7 @@ const OSS_PRODUCTION_GAMES: Array<{
   name: string;
   providerSlug: string;
   providerName: string;
-  categorySlug: "table" | "slots";
+  categorySlug: "table" | "slots" | "crash" | "instant";
   gameType: GameType;
 }> = [
   {
@@ -462,6 +462,54 @@ const OSS_PRODUCTION_GAMES: Array<{
     categorySlug: "slots",
     gameType: "SLOT",
   },
+  {
+    code: "znt-slot-geishas-revenge",
+    name: "Geisha's Revenge",
+    providerSlug: "pg-soft",
+    providerName: "PG Soft",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "znt-slot-alchemy-gold",
+    name: "Alchemy Gold",
+    providerSlug: "pg-soft",
+    providerName: "PG Soft",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "znt-slot-anubis-wrath",
+    name: "Anubis Wrath",
+    providerSlug: "pg-soft",
+    providerName: "PG Soft",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "znt-aviator",
+    name: "Aviator",
+    providerSlug: "spribe",
+    providerName: "Spribe",
+    categorySlug: "crash",
+    gameType: "CRASH",
+  },
+  {
+    code: "znt-mines",
+    name: "Mines",
+    providerSlug: "spribe",
+    providerName: "Spribe",
+    categorySlug: "instant",
+    gameType: "INSTANT",
+  },
+  {
+    code: "znt-dice",
+    name: "Dice",
+    providerSlug: "spribe",
+    providerName: "Spribe",
+    categorySlug: "instant",
+    gameType: "INSTANT",
+  },
 ];
 
 /** Pacotes que a Salsa pede para cadastrar em Produção (OSS, TaDa, etc.). */
@@ -480,11 +528,17 @@ export async function ensureOssProductionGames() {
       update: { name: item.providerName, integration: "SALSA", isActive: true },
     });
 
+    const categoryLabels: Record<string, string> = {
+      table: "Mesa",
+      slots: "Slots",
+      crash: "Crash",
+      instant: "Instantâneos",
+    };
     const category = await prisma.gameCategory.upsert({
       where: { slug: item.categorySlug },
       create: {
         slug: item.categorySlug,
-        name: item.categorySlug === "table" ? "Mesa" : "Slots",
+        name: categoryLabels[item.categorySlug] ?? item.categorySlug,
         sortOrder: item.categorySlug === "table" ? 2 : 1,
       },
       update: {},

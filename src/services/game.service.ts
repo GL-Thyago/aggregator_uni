@@ -62,8 +62,11 @@ export function resolveThumbnailUrl(game: {
 }): string | null {
   const thumb = game.thumbnailUrl?.trim() ?? "";
   if (/^https?:\/\//i.test(thumb) && !/^data:/i.test(thumb)) return thumb;
-  const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
-  return `${base}/api/v1/media/cover/${encodeURIComponent(game.slug)}`;
+  if (/^data:image\//i.test(thumb)) {
+    const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
+    return `${base}/api/v1/media/cover/${encodeURIComponent(game.slug)}`;
+  }
+  return null;
 }
 
 export function toClientGameDto(g: GameWithRelations) {
@@ -84,9 +87,9 @@ export function toClientGameDto(g: GameWithRelations) {
     providerSlug: g.provider.slug,
     gameType: g.gameType,
     playMode: external ? ("external" as const) : ("embedded" as const),
-    rtp: decimalToString(g.rtp),
-    minBet: decimalToString(g.minBet),
-    maxBet: decimalToString(g.maxBet),
+    ...(g.rtp !== undefined ? { rtp: decimalToString(g.rtp) } : {}),
+    ...(g.minBet !== undefined ? { minBet: decimalToString(g.minBet) } : {}),
+    ...(g.maxBet !== undefined ? { maxBet: decimalToString(g.maxBet) } : {}),
   };
 }
 
@@ -115,10 +118,6 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       thumbnailUrl: true,
       isFeatured: true,
       sortOrder: true,
-      rtp: true,
-      minBet: true,
-      maxBet: true,
-      aggregatorFeePct: true,
       category: { select: { id: true, slug: true, name: true } },
       provider: { select: { id: true, slug: true, name: true } },
     },
