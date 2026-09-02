@@ -11,6 +11,7 @@ import {
 } from "../../config/salsa.js";
 import { getSalsaRuntimeConfig } from "./salsa-config.service.js";
 import { salsaLogoToThumbnail } from "./salsa-logo.service.js";
+import { TADA_EXCEL_GAMES } from "./salsa-tada-catalog.js";
 import type { GameType } from "../../../generated/prisma/client.js";
 
 function slugify(name: string): string {
@@ -98,6 +99,8 @@ interface SalsaProviderJson {
 
 const CATALOG_CACHE_PATH = path.resolve(process.cwd(), "data", "salsa-catalog-cache.json");
 const SCAN_CONCURRENCY = 4;
+/** Estúdios fora da faixa baixa (TaDa live = 331). Sem isto o JSON existe mas o cassino fica vazio. */
+const EXTRA_SALSA_PROVIDER_IDS = [331];
 
 type SalsaCatalogSnapshot = {
   providers: SalsaProviderJson[];
@@ -238,9 +241,31 @@ export async function fetchAllSalsaProviders(rawUrl: string): Promise<SalsaCatal
   let scanned = 0;
   let rateLimited: string | null = null;
 
+  const extraIds = [...new Set(EXTRA_SALSA_PROVIDER_IDS.filter((id) => Number.isInteger(id) && id > 0))];
+
+  async function ingest(id: number) {
+    const page = await fetchSalsaProviderPage(base, id);
+    scanned = Math.max(scanned, id);
+    if (page.rateLimited) {
+      rateLimited = page.rateLimited;
+      return;
+    }
+    if (!page.providers.length) return;
+    foundIds.push(id);
+    mergeProviderPage(bySlug, page.providers, id);
+  }
+
+  for (const id of extraIds) {
+    if (rateLimited) break;
+    await ingest(id);
+  }
+
   for (let start = 1; start <= maxId && !rateLimited; start += SCAN_CONCURRENCY) {
     const ids: number[] = [];
-    for (let id = start; id < start + SCAN_CONCURRENCY && id <= maxId; id++) ids.push(id);
+    for (let id = start; id < start + SCAN_CONCURRENCY && id <= maxId; id++) {
+      if (!extraIds.includes(id)) ids.push(id);
+    }
+    if (!ids.length) continue;
     const pages = await Promise.all(ids.map(async (id) => ({ id, ...(await fetchSalsaProviderPage(base, id)) })));
     let batchLimited: string | null = null;
     for (const page of pages) {
@@ -533,6 +558,7 @@ export type SalsaLaunchGameInput = {
   providerName: string;
   categorySlug: "table" | "slots" | "crash" | "instant";
   gameType: GameType;
+  thumbnailUrl?: string | null;
 };
 
 function inferSalsaPackMeta(code: string): Pick<
@@ -575,6 +601,7 @@ export function normalizeSalsaLaunchGame(raw: {
   name?: string | null;
   providerName?: string | null;
   categorySlug?: string | null;
+  thumbnailUrl?: string | null;
 }): SalsaLaunchGameInput | null {
   const code = String(raw.code ?? "").trim();
   if (!code || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/.test(code)) return null;
@@ -585,6 +612,7 @@ export function normalizeSalsaLaunchGame(raw: {
       : inferred.categorySlug
   ) as SalsaLaunchGameInput["categorySlug"];
   const providerName = raw.providerName?.trim() || inferred.providerName;
+  const thumbnailUrl = raw.thumbnailUrl?.trim() || null;
   return {
     code,
     name: raw.name?.trim() || code,
@@ -592,6 +620,7 @@ export function normalizeSalsaLaunchGame(raw: {
     providerName,
     categorySlug,
     gameType: GAME_TYPE_BY_CATEGORY[categorySlug] ?? inferred.gameType,
+    thumbnailUrl: thumbnailUrl && /^https?:\/\//i.test(thumbnailUrl) ? thumbnailUrl : null,
   };
 }
 
@@ -637,6 +666,7 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
           providerId: provider.id,
           categoryId: category.id,
           gameType: item.gameType,
+          ...(item.thumbnailUrl ? { thumbnailUrl: item.thumbnailUrl } : {}),
         },
       });
       updated.push(item.code);
@@ -651,6 +681,7 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
           engine: "EXTERNAL",
           externalGameId: item.code,
           isActive: true,
+          thumbnailUrl: item.thumbnailUrl ?? null,
         },
       });
       created.push(item.code);
@@ -661,7 +692,7 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
 }
 
 export async function ensureOssProductionGames() {
-  return upsertSalsaLaunchGames(OSS_PRODUCTION_GAMES);
+  return upsertSalsaLaunchGames([...OSS_PRODUCTION_GAMES, ...TADA_EXCEL_GAMES]);
 }
 
 export async function syncSalsaGamesFromSource(options?: {

@@ -484,10 +484,11 @@ const salsaRegisterSchema = z.object({
         name: z.string().max(120).optional().nullable(),
         providerName: z.string().max(80).optional().nullable(),
         categorySlug: z.enum(["table", "slots", "crash", "instant"]).optional().nullable(),
+        thumbnailUrl: z.string().url().optional().nullable(),
       }),
     )
     .min(1)
-    .max(50),
+    .max(80),
   publish: z.boolean().optional(),
 });
 
