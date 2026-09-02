@@ -476,6 +476,52 @@ router.post("/integrations/salsa/publish", async (_req, res) => {
   }
 });
 
+const salsaRegisterSchema = z.object({
+  games: z
+    .array(
+      z.object({
+        code: z.string().min(3).max(80),
+        name: z.string().max(120).optional().nullable(),
+        providerName: z.string().max(80).optional().nullable(),
+        categorySlug: z.enum(["table", "slots", "crash", "instant"]).optional().nullable(),
+      }),
+    )
+    .min(1)
+    .max(50),
+  publish: z.boolean().optional(),
+});
+
+router.post("/integrations/salsa/register-games", async (req, res) => {
+  const parsed = salsaRegisterSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const {
+    normalizeSalsaLaunchGame,
+    upsertSalsaLaunchGames,
+    publishExternalCatalogToClients,
+  } = await import("../../../services/salsa/salsa-sync.service.js");
+
+  const items = parsed.data.games
+    .map((g) => normalizeSalsaLaunchGame(g))
+    .filter((g): g is NonNullable<typeof g> => Boolean(g));
+
+  if (!items.length) {
+    res.status(400).json({ error: "Nenhum ID Salsa válido (ex.: znt-aviator, tada-Crazy777)" });
+    return;
+  }
+
+  try {
+    const registered = await upsertSalsaLaunchGames(items);
+    const published = parsed.data.publish ? await publishExternalCatalogToClients() : null;
+    res.json({ ...registered, published });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Cadastro falhou" });
+  }
+});
+
 router.get("/integrations/salsa/config", async (_req, res) => {
   const { getSalsaRuntimeConfig } = await import("../../../services/salsa/salsa-config.service.js");
   const { getSalsaIntegrationStatus } = await import("../../../services/salsa/salsa-sync.service.js");

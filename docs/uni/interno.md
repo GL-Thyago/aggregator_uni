@@ -60,7 +60,7 @@ PG Soft (Zenith): `znt-slot-geishas-revenge`, `znt-slot-alchemy-gold`, `znt-slot
 Spribe (Zenith): `znt-aviator`, `znt-mines`, `znt-dice`.
 
 1. Salsa libera no PN de produção.
-2. Uni publica o catálogo (IDs entram no banco).
+2. ADM Integrações → **Cadastrar IDs da Salsa** (cola o e-mail) → publicar. Ou no boot/Publicar, os IDs da lista interna entram no banco.
 3. Cliente do cassino em Produção no admin.
 4. Launch: `POST /api/v1/games/{id}/launch`.
 5. Precisa de `SALSA_PN_LIVE`. Sem isso, live no host de produção falha.

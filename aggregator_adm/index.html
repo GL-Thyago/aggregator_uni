@@ -183,6 +183,15 @@
           <pre id="salsa-config-pre" class="config-pre"></pre>
         </div>
         <div class="panel">
+          <h3>Cadastrar IDs da Salsa (OPS)</h3>
+          <p class="hint">Quando a Salsa pedir jogos em Produção, cola os códigos aqui. Não precisa de novo deploy. Ex.: <code>znt-aviator</code>, <code>tada-Crazy777</code>. Marca publicar para os cassinos verem na hora.</p>
+          <textarea id="salsa-register-pack" rows="8" placeholder="Cole o e-mail ou os IDs, um por linha:&#10;znt-slot-geishas-revenge&#10;znt-aviator&#10;tada-BombingFishing Bombing Fishing"></textarea>
+          <div class="inline-form" style="margin-top:0.75rem">
+            <label class="inline-check"><input type="checkbox" id="salsa-register-publish" checked> Publicar no cassino depois</label>
+            <button type="button" id="btn-salsa-register">Cadastrar IDs</button>
+          </div>
+        </div>
+        <div class="panel">
           <h3>Jogos Salsa / terceiros importados</h3>
           <p class="hint">Ex.: Tigrinho repasse 5% · Banca X cobrada 20% (15% sua margem) — configure repasse aqui e cobrança por cliente na aba Clientes.</p>
           <div class="inline-form">

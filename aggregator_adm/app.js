@@ -37,6 +37,30 @@ function showError(msg) {
   el.classList.remove("hidden");
 }
 
+/** Extrai IDs do e-mail da Salsa (znt-aviator, tada-Crazy777, evo-oss-…). */
+function parseSalsaPackText(raw) {
+  const games = [];
+  const seen = new Set();
+
+  for (const line of String(raw).split(/\r?\n/)) {
+    const matches = [...line.matchAll(/\b([A-Za-z][A-Za-z0-9]{1,14}-[A-Za-z0-9][A-Za-z0-9_-]{1,70})\b/g)];
+    for (const m of matches) {
+      const code = m[1];
+      if (/^ops-\d+$/i.test(code) || /^https?$/i.test(code)) continue;
+      if (seen.has(code)) continue;
+      seen.add(code);
+      const name = line
+        .replace(code, " ")
+        .replace(/[-–—|:]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      games.push({ code, name: name.length > 1 ? name : undefined });
+    }
+  }
+
+  return games;
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(state.apiBase + path, {
     ...opts,
@@ -626,6 +650,38 @@ function initUi() {
     try {
       const result = await api("/integrations/salsa/publish", { method: "POST", body: "{}" });
       alert(`Catálogo publicado: ${result.gamesActivated} jogos ativos para ${result.entitlements?.clients ?? 0} operador(es)`);
+      loadIntegrationsView();
+    } catch (e) {
+      showError(e.message);
+    }
+  });
+
+  $("#btn-salsa-register")?.addEventListener("click", async () => {
+    showError("");
+    const games = parseSalsaPackText($("#salsa-register-pack")?.value || "");
+    if (!games.length) {
+      showError("Cole pelo menos um ID Salsa (ex.: znt-aviator).");
+      return;
+    }
+    try {
+      const result = await api("/integrations/salsa/register-games", {
+        method: "POST",
+        body: JSON.stringify({
+          games,
+          publish: Boolean($("#salsa-register-publish")?.checked),
+        }),
+      });
+      const created = (result.created || []).join(", ") || "nenhum novo";
+      const updated = (result.updated || []).join(", ") || "nenhum";
+      alert(
+        `Cadastrados: ${result.count}` +
+          `\nNovos: ${created}` +
+          `\nJá existiam: ${updated}` +
+          (result.published
+            ? `\nPublicado: ${result.published.gamesActivated} jogos ativos`
+            : "\nNão publicado — clica em Publicar no cassino se precisares."),
+      );
+      $("#salsa-register-pack").value = "";
       loadIntegrationsView();
     } catch (e) {
       showError(e.message);

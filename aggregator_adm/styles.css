@@ -142,6 +142,17 @@ tr:hover td { background: rgba(99, 102, 241, 0.05); }
 .form-grid .actions { display: flex; gap: 8px; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .inline-form input { flex: 1; min-width: 140px; }
+textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #333);
+  background: var(--panel-2, #111);
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+}
 
 .ent-row {
   display: grid;

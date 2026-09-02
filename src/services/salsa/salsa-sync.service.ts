@@ -512,11 +512,95 @@ const OSS_PRODUCTION_GAMES: Array<{
   },
 ];
 
-/** Pacotes que a Salsa pede para cadastrar em Produção (OSS, TaDa, etc.). */
-export async function ensureOssProductionGames() {
-  const created: string[] = [];
+const CATEGORY_LABELS: Record<string, string> = {
+  table: "Mesa",
+  slots: "Slots",
+  crash: "Crash",
+  instant: "Instantâneos",
+};
 
-  for (const item of OSS_PRODUCTION_GAMES) {
+const GAME_TYPE_BY_CATEGORY: Record<string, GameType> = {
+  table: "TABLE",
+  slots: "SLOT",
+  crash: "CRASH",
+  instant: "INSTANT",
+};
+
+export type SalsaLaunchGameInput = {
+  code: string;
+  name: string;
+  providerSlug: string;
+  providerName: string;
+  categorySlug: "table" | "slots" | "crash" | "instant";
+  gameType: GameType;
+};
+
+function inferSalsaPackMeta(code: string): Pick<
+  SalsaLaunchGameInput,
+  "providerSlug" | "providerName" | "categorySlug" | "gameType"
+> {
+  const lower = code.trim().toLowerCase();
+  if (lower.startsWith("tada-")) {
+    return { providerSlug: "tada-gaming", providerName: "TaDa Gaming", categorySlug: "slots", gameType: "SLOT" };
+  }
+  if (lower === "znt-aviator") {
+    return { providerSlug: "spribe", providerName: "Spribe", categorySlug: "crash", gameType: "CRASH" };
+  }
+  if (lower === "znt-mines" || lower === "znt-dice") {
+    return { providerSlug: "spribe", providerName: "Spribe", categorySlug: "instant", gameType: "INSTANT" };
+  }
+  if (lower.startsWith("znt-slot-") || lower.startsWith("znt-")) {
+    return { providerSlug: "pg-soft", providerName: "PG Soft", categorySlug: "slots", gameType: "SLOT" };
+  }
+  if (lower.startsWith("evo-")) {
+    return { providerSlug: "evolution", providerName: "Evolution", categorySlug: "table", gameType: "TABLE" };
+  }
+  if (lower.startsWith("ez-")) {
+    return { providerSlug: "ezugi", providerName: "Ezugi", categorySlug: "table", gameType: "TABLE" };
+  }
+  if (lower.startsWith("net-")) {
+    return { providerSlug: "netent", providerName: "NetEnt", categorySlug: "slots", gameType: "SLOT" };
+  }
+  if (lower.startsWith("ret-")) {
+    return { providerSlug: "red-tiger", providerName: "Red Tiger", categorySlug: "slots", gameType: "SLOT" };
+  }
+  if (lower.startsWith("nl-")) {
+    return { providerSlug: "no-limit-city", providerName: "No Limit City", categorySlug: "slots", gameType: "SLOT" };
+  }
+  return { providerSlug: "salsa", providerName: "Salsa", categorySlug: "slots", gameType: "SLOT" };
+}
+
+export function normalizeSalsaLaunchGame(raw: {
+  code: string;
+  name?: string | null;
+  providerName?: string | null;
+  categorySlug?: string | null;
+}): SalsaLaunchGameInput | null {
+  const code = String(raw.code ?? "").trim();
+  if (!code || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/.test(code)) return null;
+  const inferred = inferSalsaPackMeta(code);
+  const categorySlug = (
+    ["table", "slots", "crash", "instant"].includes(String(raw.categorySlug))
+      ? raw.categorySlug
+      : inferred.categorySlug
+  ) as SalsaLaunchGameInput["categorySlug"];
+  const providerName = raw.providerName?.trim() || inferred.providerName;
+  return {
+    code,
+    name: raw.name?.trim() || code,
+    providerSlug: raw.providerName?.trim() ? slugify(raw.providerName) : inferred.providerSlug,
+    providerName,
+    categorySlug,
+    gameType: GAME_TYPE_BY_CATEGORY[categorySlug] ?? inferred.gameType,
+  };
+}
+
+/** Cadastra IDs Salsa (e-mail OPS) sem novo deploy. */
+export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
+  const created: string[] = [];
+  const updated: string[] = [];
+
+  for (const item of items) {
     const provider = await prisma.gameProvider.upsert({
       where: { slug: item.providerSlug },
       create: {
@@ -528,17 +612,11 @@ export async function ensureOssProductionGames() {
       update: { name: item.providerName, integration: "SALSA", isActive: true },
     });
 
-    const categoryLabels: Record<string, string> = {
-      table: "Mesa",
-      slots: "Slots",
-      crash: "Crash",
-      instant: "Instantâneos",
-    };
     const category = await prisma.gameCategory.upsert({
       where: { slug: item.categorySlug },
       create: {
         slug: item.categorySlug,
-        name: categoryLabels[item.categorySlug] ?? item.categorySlug,
+        name: CATEGORY_LABELS[item.categorySlug] ?? item.categorySlug,
         sortOrder: item.categorySlug === "table" ? 2 : 1,
       },
       update: {},
@@ -561,6 +639,7 @@ export async function ensureOssProductionGames() {
           gameType: item.gameType,
         },
       });
+      updated.push(item.code);
     } else {
       await prisma.game.create({
         data: {
@@ -578,7 +657,11 @@ export async function ensureOssProductionGames() {
     }
   }
 
-  return { count: OSS_PRODUCTION_GAMES.length, created };
+  return { count: items.length, created, updated };
+}
+
+export async function ensureOssProductionGames() {
+  return upsertSalsaLaunchGames(OSS_PRODUCTION_GAMES);
 }
 
 export async function syncSalsaGamesFromSource(options?: {
