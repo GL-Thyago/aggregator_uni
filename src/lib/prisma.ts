@@ -6,7 +6,13 @@ import { env } from "../config/env.js";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createPrismaClient(): PrismaClient {
-  const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
+  const max = Number(process.env.DB_POOL_MAX ?? 20);
+  const pool = new pg.Pool({
+    connectionString: env.DATABASE_URL,
+    max,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }

@@ -54,7 +54,8 @@ Falha: `GET /admin/v1/integrations/salsa/last-request` (`X-Admin-Key`).
 
 ## Jogos em produção (OPS-3353)
 
-IDs: `evo-oss-xs-monopoly-live`, `ez-oss-CricketWar`, `net-oss-Quest2ReturntoElDorado`, `ret-oss-atlantis`, `nl-oss-DJPsycho`.
+IDs OSS: `evo-oss-xs-monopoly-live`, `ez-oss-CricketWar`, `net-oss-Quest2ReturntoElDorado`, `ret-oss-atlantis`, `nl-oss-DJPsycho`.  
+TaDa: `tada-BombingFishing`, `tada-Crazy777`, `tada-BubbleBeauty`.
 
 1. Salsa libera no PN de produção.
 2. Uni publica o catálogo (IDs entram no banco).

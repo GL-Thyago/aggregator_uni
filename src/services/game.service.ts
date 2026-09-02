@@ -112,6 +112,7 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       assetPath: true,
       externalUrl: true,
       externalGameId: true,
+      thumbnailUrl: true,
       isFeatured: true,
       sortOrder: true,
       rtp: true,

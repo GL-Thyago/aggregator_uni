@@ -438,9 +438,33 @@ const OSS_PRODUCTION_GAMES: Array<{
     categorySlug: "slots",
     gameType: "SLOT",
   },
+  {
+    code: "tada-BombingFishing",
+    name: "Bombing Fishing",
+    providerSlug: "tada-gaming",
+    providerName: "TaDa Gaming",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "tada-Crazy777",
+    name: "Crazy777",
+    providerSlug: "tada-gaming",
+    providerName: "TaDa Gaming",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
+  {
+    code: "tada-BubbleBeauty",
+    name: "Bubble Beauty",
+    providerSlug: "tada-gaming",
+    providerName: "TaDa Gaming",
+    categorySlug: "slots",
+    gameType: "SLOT",
+  },
 ];
 
-/** Jogos do pacote Evolution OSS liberados em produção (OPS-3353). */
+/** Pacotes que a Salsa pede para cadastrar em Produção (OSS, TaDa, etc.). */
 export async function ensureOssProductionGames() {
   const created: string[] = [];
 

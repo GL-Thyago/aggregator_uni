@@ -2,8 +2,11 @@ import { prisma } from "../lib/prisma.js";
 import { decodeSalsaThumbnail } from "./salsa/salsa-logo.service.js";
 
 export async function getGameCoverPayload(slug: string) {
-  const game = await prisma.game.findUnique({
-    where: { slug },
+  const decodedSlug = decodeURIComponent(slug);
+  const game = await prisma.game.findFirst({
+    where: {
+      OR: [{ slug: decodedSlug }, { externalGameId: decodedSlug }, { slug }, { externalGameId: slug }],
+    },
     select: { thumbnailUrl: true },
   });
   if (!game) return null;
