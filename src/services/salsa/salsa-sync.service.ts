@@ -294,6 +294,19 @@ export async function getSalsaIntegrationStatus() {
     gameLogo: env.SALSA_GAME_LOGO,
     apiBase: env.SALSA_API_BASE,
     defaultCostPct: env.SALSA_DEFAULT_COST_PCT,
+    test: {
+      pn: env.SALSA_PN ?? null,
+      apiBase: "https://api-test.salsagator.com",
+      gameListUrl: env.SALSA_GAME_LIST_URL ?? null,
+      hasHashKey: Boolean(env.SALSA_HASH_KEY),
+    },
+    live: {
+      pn: env.SALSA_PN_LIVE ?? null,
+      apiBase: "https://api.salsagator.com",
+      gameListUrl: env.SALSA_GAME_LIST_URL_LIVE ?? null,
+      hasHashKey: Boolean(env.SALSA_HASH_KEY_LIVE || env.SALSA_HASH_KEY),
+      ready: Boolean(env.SALSA_PN_LIVE),
+    },
     providerActive: salsaProviders.some((p) => p.isActive),
     gamesImported: gameCount,
     missing: [

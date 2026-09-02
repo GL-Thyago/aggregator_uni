@@ -487,6 +487,8 @@ router.get("/integrations/salsa/config", async (_req, res) => {
     publisherUrl: status.publisherUrl,
     gamesImported: status.gamesImported,
     providerActive: status.providerActive,
+    test: status.test,
+    live: status.live,
   });
 });
 

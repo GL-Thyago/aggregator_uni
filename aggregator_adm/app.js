@@ -410,9 +410,11 @@ async function loadIntegrationsView() {
       api("/integrations/salsa/config").catch(() => null),
     ]);
 
+    const liveReady = Boolean(salsa.live?.ready || salsaCfg?.live?.ready);
     $("#salsa-status").innerHTML = [
       { label: "Salsa ativa", value: (salsaCfg?.enabled ?? salsa.enabled) ? "Sim" : "Não", cls: (salsaCfg?.enabled ?? salsa.enabled) ? "ok" : "warn" },
-      { label: "Credenciais OK", value: salsa.configured ? "Sim" : "Faltam chaves", cls: salsa.configured ? "ok" : "bad" },
+      { label: "PN teste", value: salsa.test?.pn || salsa.pn || "—" },
+      { label: "PN produção", value: salsa.live?.pn || "ainda vazio no env", cls: liveReady ? "ok" : "warn" },
       { label: "Jogos importados", value: salsa.gamesImported },
       { label: "Provedor ativo", value: salsa.providerActive ? "Sim" : "Não" },
       { label: "Repasse padrão", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
@@ -427,15 +429,19 @@ async function loadIntegrationsView() {
       form.defaultProviderCostPct.value = salsaCfg.defaultProviderCostPct ?? "";
     }
 
-    $("#salsa-config-pre").textContent = `# URL para cadastrar na Salsa (Publisher):
+    $("#salsa-config-pre").textContent = `# Publisher (único, a Salsa chama isto):
 ${salsa.publisherUrl}
-${salsa.publisherWarning ? `\n# ATENÇÃO: ${salsa.publisherWarning}` : ""}
 
-# Fluxo rápido:
-# 1. Salve PN + Hash + URL JSON acima
-# 2. Importar jogos → ativar provedor
-# 3. Cadastre a URL pública acima no painel da Salsa (não use localhost)
-# 4. Clientes → cobrança total % por jogo`;
+# TESTE (o formulário acima — deve continuar staging)
+PN: ${salsa.test?.pn || salsa.pn || "—"}
+API: ${salsa.test?.apiBase || "https://api-test.salsagator.com"}
+
+# PRODUÇÃO (EasyPanel: SALSA_PN_LIVE — NÃO é este formulário)
+PN live: ${salsa.live?.pn || "NÃO CONFIGURADO — por isso ainda parece teste"}
+API live: https://api.salsagator.com
+
+# Quem usa teste ou live: aba Clientes → Ambiente do cassino
+# Publicar 5069 jogos não muda o PN. Só libera o catálogo.`;
 
     renderSalsaGamesTable(salsaGames.games || []);
 

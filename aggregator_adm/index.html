@@ -163,7 +163,7 @@
       <section id="view-integrations" class="view hidden">
         <div class="panel">
           <h3>Salsa Technology</h3>
-          <p class="hint">A URL do Publisher cadastrada na Salsa tem que ser pública (API do agregador). localhost gera "Communication error" no jogo. Use um túnel e SALSA_PUBLISHER_URL.</p>
+          <p class="hint">Este formulário é o ambiente de <strong>TESTE</strong> (staging). Produção fica no EasyPanel: <code>SALSA_PN_LIVE</code> + <code>SALSA_HASH_KEY_LIVE</code>. O seletor no topo da página é o <strong>cassino</strong>, não o ambiente Salsa. Cada cliente escolhe Teste ou Produção na aba Clientes.</p>
           <div id="salsa-status" class="cards"></div>
           <div class="inline-form">
             <button id="btn-salsa-sync">Importar jogos do JSON Salsa</button>
@@ -173,10 +173,10 @@
           </div>
           <form id="salsa-config-form" class="form-grid" style="margin-top:1rem">
             <label><input type="checkbox" name="enabled"> Salsa ativa</label>
-            <label>PN (Publisher Name)<input name="publisherName" placeholder="SALSA_PN"></label>
-            <label>Hash Key<input name="hashKey" type="password" placeholder="deixe vazio para manter"></label>
-            <label>URL JSON jogos<input name="gameListUrl" type="url" placeholder="SALSA_GAME_LIST_URL"></label>
-            <label>API Base<input name="apiBase" placeholder="https://api-test.salsagator.com"></label>
+            <label>PN teste (staging)<input name="publisherName" placeholder="rg-games-staging"></label>
+            <label>Hash Key teste<input name="hashKey" type="password" placeholder="deixe vazio para manter"></label>
+            <label>URL JSON teste<input name="gameListUrl" type="url" placeholder="https://back-test.patagoniaentertainment.com/..."></label>
+            <label>API Base teste<input name="apiBase" placeholder="https://api-test.salsagator.com"></label>
             <label>Repasse padrão %<input name="defaultProviderCostPct" type="number" step="0.1"></label>
             <div class="full actions"><button type="submit">Salvar config Salsa</button></div>
           </form>
