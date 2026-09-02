@@ -610,7 +610,11 @@ function initUi() {
           defaultCostPct,
         }),
       });
-      alert(`Sync OK: ${result.created} novos, ${result.updated} atualizados`);
+      alert(
+        `Sync OK: ${result.created} novos, ${result.updated} atualizados` +
+          `\nCapas URL: ${result.logosFromUrl ?? 0} · BASE64: ${result.logosFromBase64 ?? 0}` +
+          (result.fromCache ? "\n(usou cache — se capas = 0, espera 24h ou força um sync novo)" : ""),
+      );
       loadIntegrationsView();
     } catch (e) {
       showError(e.message);

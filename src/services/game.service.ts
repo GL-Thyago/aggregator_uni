@@ -15,7 +15,8 @@ type GameWithRelations = {
   assetPath: string | null;
   externalUrl: string | null;
   externalGameId: string | null;
-  thumbnailUrl: string | null;
+  thumbnailUrl?: string | null;
+  sortOrder?: number;
   rtp: unknown;
   minBet: unknown;
   maxBet: unknown;
@@ -56,13 +57,13 @@ export function buildLaunchUrl(game: {
 
 export function resolveThumbnailUrl(game: {
   slug: string;
-  assetPath: string | null;
-  thumbnailUrl: string | null;
+  assetPath?: string | null;
+  thumbnailUrl?: string | null;
 }): string | null {
   const thumb = game.thumbnailUrl?.trim() ?? "";
-  if (/^data:image\//i.test(thumb)) return thumb;
-  if (/^https?:\/\//i.test(thumb)) return thumb;
-  return null;
+  if (/^https?:\/\//i.test(thumb) && !/^data:/i.test(thumb)) return thumb;
+  const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
+  return `${base}/api/v1/media/cover/${encodeURIComponent(game.slug)}`;
 }
 
 export function toClientGameDto(g: GameWithRelations) {
@@ -100,7 +101,26 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       externalGameId: { not: null },
       provider: { isActive: true, integration: "SALSA" },
     },
-    include: { category: true, provider: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      categoryId: true,
+      providerId: true,
+      gameType: true,
+      engine: true,
+      assetPath: true,
+      externalUrl: true,
+      externalGameId: true,
+      isFeatured: true,
+      sortOrder: true,
+      rtp: true,
+      minBet: true,
+      maxBet: true,
+      aggregatorFeePct: true,
+      category: { select: { id: true, slug: true, name: true } },
+      provider: { select: { id: true, slug: true, name: true } },
+    },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
   });
 }

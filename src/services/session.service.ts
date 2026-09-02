@@ -80,6 +80,11 @@ export async function createGameSession(input: {
     game.slug === "gpi-validation" || game.externalGameId === "gpi-validation";
   const environment: UniEnvironment =
     input.environment ?? (client.launchEnvironment === "LIVE" ? "live" : "test");
+  if (isExternal && environment === "live" && !env.SALSA_PN_LIVE) {
+    throw new Error(
+      "Launch em produção exige SALSA_PN_LIVE no EasyPanel do aggregator (PN de produção da Salsa, não o de staging).",
+    );
+  }
   const salsaEnv = UNI_SALSA[environment];
   const launchUrl = isExternal
     ? buildSalsaLaunchUrl({

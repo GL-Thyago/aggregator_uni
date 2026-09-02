@@ -33,7 +33,7 @@ export function uniPublicBase(): string {
 
 export function uniPn(environment: UniEnvironment): string | undefined {
   if (environment === "live") {
-    return env.SALSA_PN_LIVE || env.SALSA_PN;
+    return env.SALSA_PN_LIVE;
   }
   return env.SALSA_PN;
 }

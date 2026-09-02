@@ -108,6 +108,23 @@ type SalsaCatalogSnapshot = {
   rateLimited?: string | null;
 };
 
+function catalogUrlHasPn(raw: string): boolean {
+  try {
+    const pn = new URL(raw).searchParams.get("pn");
+    return Boolean(pn && pn.trim());
+  } catch {
+    return false;
+  }
+}
+
+/** Produção com PN preenchido tem prioridade no sync (capas do CMS live). Senão usa o JSON de teste. */
+function resolveSyncCatalogUrl(preferred?: string | null, fallback?: string | null): string | undefined {
+  const live = env.SALSA_GAME_LIST_URL_LIVE?.trim();
+  if (preferred?.trim()) return preferred.trim();
+  if (live && catalogUrlHasPn(live)) return live;
+  return fallback?.trim() || env.SALSA_GAME_LIST_URL || undefined;
+}
+
 function catalogBaseUrl(raw: string): URL {
   const url = new URL(raw);
   url.searchParams.delete("provider");
@@ -494,7 +511,7 @@ export async function syncSalsaGamesFromSource(options?: {
   await hideNonSalsaCatalog();
 
   const cfg = await getSalsaRuntimeConfig();
-  const url = options?.gameListUrl ?? cfg.gameListUrl ?? env.SALSA_GAME_LIST_URL;
+  const url = resolveSyncCatalogUrl(options?.gameListUrl, cfg.gameListUrl);
   if (!url) {
     throw new Error("SALSA_GAME_LIST_URL não configurada — peça a URL do JSON à Salsa");
   }
