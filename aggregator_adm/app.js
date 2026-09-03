@@ -202,14 +202,14 @@ async function loadDashboard() {
 function renderClientsTable() {
   $("#clients-table").innerHTML = `<table>
     <thead><tr>
-      <th>Nome</th><th>Ambiente</th><th>Cobrança</th><th>Margem</th><th>Saldo B2B</th><th>Status</th><th></th>
+      <th>Nome</th><th>Ambiente</th><th>Cobrança</th><th>Cobrança %</th><th>Saldo B2B</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>${state.clients.map((c) => `
       <tr>
         <td>${c.name}</td>
         <td>${c.launchEnvironment === "LIVE" ? "Produção" : "Teste"}</td>
         <td><span class="badge ${c.billingMode === "POSTPAID" ? "postpaid" : "prepaid"}">${c.billingMode === "POSTPAID" ? "Pós-pago" : "Pré-pago"}${c.maxCredit ? ` · limite ${money(c.maxCredit)}` : ""}</span></td>
-        <td class="num">${Number(c.marginPct)}%</td>
+        <td class="num">${c.chargePct != null ? Number(c.chargePct) + "%" : "padrão"}</td>
         <td class="num">${money(c.clientWallet?.balance ?? 0)}</td>
         <td class="${c.isActive ? "ok" : "bad"}">${c.isActive ? "Ativo" : "Inativo"}</td>
         <td><button class="ghost btn-open-client" data-id="${c.id}">Gerenciar</button></td>
@@ -285,7 +285,7 @@ async function refreshClientDetail() {
     { label: "Saldo B2B", value: money(wallet.balance), cls: wallet.balance < 0 ? "bad" : "ok" },
     { label: "Cobrança", value: wallet.client.billingMode === "POSTPAID" ? "Pós-pago" : "Pré-pago" },
     { label: "Crédito disponível", value: money(wallet.availableCredit) },
-    { label: "Margem B2B", value: Number(wallet.client.marginPct) + "%" },
+    { label: "Cobrança B2B", value: client.chargePct != null ? Number(client.chargePct) + "%" : "padrão global" },
   ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
 
   const enabledGames = games.filter((g) =>
@@ -339,7 +339,7 @@ async function refreshClientDetail() {
     $("#client-form-title").textContent = "Editar: " + client.name;
     const form = $("#client-form");
     form.name.value = client.name;
-    form.marginPct.value = Number(client.marginPct);
+    form.chargePct.value = client.chargePct ?? "";
     form.billingMode.value = client.billingMode || "PREPAID";
     form.maxCredit.value = client.maxCredit ?? "";
     form.initialBalance.value = 0;
@@ -364,7 +364,8 @@ async function loadPartnersView() {
     select.value = current;
     if (!select.value) {
       $("#partner-summary").innerHTML = "";
-      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores e comissões.</p>";
+      $("#partner-charge-box")?.classList.add("hidden");
+      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores.</p>";
       saveBtn.disabled = true;
       return;
     }
@@ -380,14 +381,25 @@ async function renderPartnerAccess(clientId) {
   const live = data.providers.filter((p) => p.isEnabled && p.isActiveGlobal).length;
   $("#partner-summary").innerHTML = [
     { label: "Sócio", value: data.client.name },
-    { label: "Margem padrão", value: data.client.marginPct + "%" },
+    { label: "% Salsa (todos)", value: data.defaults.salsaPct + "%" },
+    { label: "Cobrança padrão", value: data.defaults.operatorChargePct + "%" },
+    { label: "Cobrança deste sócio", value: data.client.resolvedChargePct + "%", cls: data.client.chargePct != null ? "ok" : "" },
+    { label: "Sua margem", value: data.client.yourMarginPct + "%" },
     { label: "Provedores liberados", value: enabled, cls: enabled ? "ok" : "warn" },
-    { label: "Já no ar (global + sócio)", value: live, cls: live ? "ok" : "warn" },
+    { label: "Já no ar", value: live, cls: live ? "ok" : "warn" },
   ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
+
+  const chargeBox = $("#partner-charge-box");
+  chargeBox?.classList.remove("hidden");
+  const chargeInput = $("#partner-charge-override");
+  chargeInput.placeholder = String(data.defaults.operatorChargePct);
+  chargeInput.value = data.client.chargePct ?? "";
+  $("#partner-charge-hint").textContent =
+    `Salsa ${data.defaults.salsaPct}% · vazio = cobra ${data.defaults.operatorChargePct}% como os outros · sua margem = cobrança − Salsa`;
 
   $("#partner-providers-table").innerHTML = `<table>
     <thead><tr>
-      <th>Liberar</th><th>Provedor</th><th>Catálogo</th><th>Jogos</th><th>Repasse Salsa %</th><th>Cobrança sócio %</th><th>Sua margem</th>
+      <th>Liberar</th><th>Provedor</th><th>Catálogo</th><th>Jogos</th>
     </tr></thead>
     <tbody>${data.providers.map((p) => `
       <tr data-provider-id="${p.providerId}">
@@ -395,35 +407,17 @@ async function renderPartnerAccess(clientId) {
         <td><strong>${p.name}</strong><br><small>${p.slug}</small></td>
         <td class="${p.isActiveGlobal ? "ok" : "bad"}">${p.isActiveGlobal ? "Ativo" : "Desligado"}</td>
         <td class="num">${p.activeGameCount}/${p.gameCount}</td>
-        <td><input class="rate-input partner-fee" type="number" step="0.1" value="${p.feePct ?? ""}" placeholder="${p.defaultCostPct}"></td>
-        <td><input class="rate-input partner-charge" type="number" step="0.1" value="${p.chargePct ?? ""}" placeholder="${p.resolvedChargePct}"></td>
-        <td class="num partner-margin">${p.yourMarginPct}%</td>
       </tr>`).join("")}
     </tbody></table>`;
 
-  const updateMargin = (tr) => {
-    const fee = Number(tr.querySelector(".partner-fee").value || tr.querySelector(".partner-fee").placeholder);
-    const chargeVal = tr.querySelector(".partner-charge").value;
-    const charge = chargeVal !== "" ? Number(chargeVal) : Number(tr.querySelector(".partner-charge").placeholder);
-    tr.querySelector(".partner-margin").textContent = Math.max(0, charge - fee).toFixed(1) + "%";
-  };
-  $$("#partner-providers-table .partner-fee, #partner-providers-table .partner-charge").forEach((input) => {
-    input.addEventListener("input", () => updateMargin(input.closest("tr")));
-  });
   $("#btn-save-partner-access").disabled = false;
 }
 
 function readPartnerAccessFromTable() {
-  return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => {
-    const fee = tr.querySelector(".partner-fee").value;
-    const charge = tr.querySelector(".partner-charge").value;
-    return {
-      providerId: Number(tr.dataset.providerId),
-      isEnabled: tr.querySelector(".partner-enabled").checked,
-      feePct: fee !== "" ? Number(fee) : null,
-      chargePct: charge !== "" ? Number(charge) : null,
-    };
-  });
+  return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => ({
+    providerId: Number(tr.dataset.providerId),
+    isEnabled: tr.querySelector(".partner-enabled").checked,
+  }));
 }
 
 async function loadRevenueView() {
@@ -476,30 +470,19 @@ function renderSalsaGamesTable(games) {
   }
   $("#salsa-games-table").innerHTML = `<table>
     <thead><tr>
-      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>Repasse %</th><th>Status</th><th></th>
+      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>${games.map((g) => `
       <tr data-game-id="${g.id}">
         <td><strong>${g.name}</strong><br><small>${g.slug}</small></td>
         <td><code>${g.externalGameId || "—"}</code></td>
         <td>${g.provider?.name || "—"}</td>
-        <td><input class="rate-input salsa-game-cost" data-id="${g.id}" type="number" step="0.1" value="${g.providerCostPct}"></td>
         <td class="${g.isActive ? "ok" : "bad"}">${g.isActive ? "Ativo" : "Off"}</td>
         <td>
-          <button class="ghost btn-save-salsa-game-cost" data-id="${g.id}">Salvar %</button>
           <button class="ghost btn-toggle-salsa-game" data-id="${g.id}" data-active="${g.isActive}">${g.isActive ? "Desligar" : "Ligar"}</button>
         </td>
       </tr>`).join("")}
     </tbody></table>`;
-
-  $$(".btn-save-salsa-game-cost").forEach((btn) => btn.addEventListener("click", async () => {
-    const id = btn.dataset.id;
-    const input = document.querySelector(`.salsa-game-cost[data-id="${id}"]`);
-    const providerCostPct = Number(input.value);
-    if (!Number.isFinite(providerCostPct)) return alert("Informe o repasse %");
-    await api(`/games/${id}/fees`, { method: "PATCH", body: JSON.stringify({ providerCostPct }) });
-    loadIntegrationsView();
-  }));
 
   $$(".btn-toggle-salsa-game").forEach((btn) => btn.addEventListener("click", async () => {
     const id = btn.dataset.id;
@@ -526,8 +509,8 @@ async function loadIntegrationsView() {
       { label: "PN produção", value: salsa.live?.pn || "ainda vazio no env", cls: liveReady ? "ok" : "warn" },
       { label: "Jogos importados", value: salsa.gamesImported },
       { label: "Jogos ativos", value: salsa.gamesActive ?? "—", cls: salsa.gamesActive ? "ok" : "warn" },
-      { label: "Provedor ativo", value: salsa.providerActive ? "Sim" : "Não" },
-      { label: "Repasse padrão", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
+      { label: "% Salsa", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
+      { label: "% operador", value: (salsaCfg?.defaultOperatorChargePct ?? "—") + "%" },
     ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
 
     if (salsaCfg) {
@@ -536,7 +519,11 @@ async function loadIntegrationsView() {
       form.publisherName.value = salsaCfg.publisherName || "";
       form.gameListUrl.value = salsaCfg.gameListUrl || "";
       form.apiBase.value = salsaCfg.apiBase || "";
-      form.defaultProviderCostPct.value = salsaCfg.defaultProviderCostPct ?? "";
+      const commissions = $("#commission-defaults-form");
+      if (commissions) {
+        commissions.defaultProviderCostPct.value = salsaCfg.defaultProviderCostPct ?? 6.5;
+        commissions.defaultOperatorChargePct.value = salsaCfg.defaultOperatorChargePct ?? 20;
+      }
     }
 
     $("#salsa-config-pre").textContent = `# Publisher (único, a Salsa chama isto):
@@ -557,7 +544,7 @@ API live: https://api.salsagator.com
 
     $("#providers-table").innerHTML = `<table>
       <thead><tr>
-        <th>Provedor</th><th>Integração</th><th>Jogos</th><th>Ativos</th><th>Repasse %</th><th>Status</th><th>Ações</th>
+        <th>Provedor</th><th>Integração</th><th>Jogos</th><th>Ativos</th><th>Status</th><th>Ações</th>
       </tr></thead>
       <tbody>${providers.map((p) => `
         <tr>
@@ -565,11 +552,9 @@ API live: https://api.salsagator.com
           <td>${p.integration || "NATIVE"}</td>
           <td class="num">${p.gameCount ?? "—"}</td>
           <td class="num">${p.activeGameCount ?? "—"}</td>
-          <td><input class="rate-input provider-cost" data-id="${p.id}" type="number" step="0.1" value="${p.defaultCostPct ?? ""}" placeholder="—"></td>
           <td class="${p.isActive ? "ok" : "bad"}">${p.isActive ? "Ativo" : "Desativado"}</td>
           <td>
             <button class="ghost btn-toggle-provider" data-id="${p.id}" data-active="${p.isActive}">${p.isActive ? "Desativar" : "Ativar"}</button>
-            <button class="ghost btn-apply-cost" data-id="${p.id}">Salvar %</button>
           </td>
         </tr>`).join("")}
       </tbody></table>`;
@@ -584,15 +569,6 @@ API live: https://api.salsagator.com
         method: "PATCH",
         body: JSON.stringify({ isActive: newActive }),
       });
-      loadIntegrationsView();
-    }));
-
-    $$(".btn-apply-cost").forEach((btn) => btn.addEventListener("click", async () => {
-      const id = btn.dataset.id;
-      const input = document.querySelector(`.provider-cost[data-id="${id}"]`);
-      const costPct = Number(input.value);
-      if (!Number.isFinite(costPct)) return alert("Informe o % de repasse");
-      await api(`/providers/${id}/apply-cost`, { method: "POST", body: JSON.stringify({ costPct }) });
       loadIntegrationsView();
     }));
   } catch (e) {
@@ -716,7 +692,8 @@ function initUi() {
     const id = e.target.value;
     if (!id) {
       $("#partner-summary").innerHTML = "";
-      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores e comissões.</p>";
+      $("#partner-charge-box")?.classList.add("hidden");
+      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores.</p>";
       $("#btn-save-partner-access").disabled = true;
       return;
     }
@@ -734,10 +711,13 @@ function initUi() {
     try {
       await api("/clients/" + clientId + "/partner-access", {
         method: "PUT",
-        body: JSON.stringify({ providers: readPartnerAccessFromTable() }),
+        body: JSON.stringify({
+          chargePct: $("#partner-charge-override").value !== "" ? Number($("#partner-charge-override").value) : null,
+          providers: readPartnerAccessFromTable(),
+        }),
       });
       await renderPartnerAccess(clientId);
-      alert("Acesso e comissões do sócio salvos.");
+      alert("Acesso e cobrança do sócio salvos.");
     } catch (err) {
       showError(err.message);
     }
@@ -755,11 +735,7 @@ function initUi() {
     if (detail) detail.textContent = "Isto pode levar alguns minutos. Não feche a página.";
 
     try {
-      const defaultCostPct = $("#salsa-default-cost").value !== "" ? Number($("#salsa-default-cost").value) : undefined;
-      await api("/integrations/salsa/sync", {
-        method: "POST",
-        body: JSON.stringify({ defaultCostPct }),
-      });
+      await api("/integrations/salsa/sync", { method: "POST", body: "{}" });
 
       const started = Date.now();
       while (Date.now() - started < 15 * 60 * 1000) {
@@ -837,6 +813,31 @@ function initUi() {
     }
   });
 
+  $("#commission-defaults-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showError("");
+    const form = e.target;
+    try {
+      const salsaPct = Number(form.defaultProviderCostPct.value);
+      const chargePct = Number(form.defaultOperatorChargePct.value);
+      if (!Number.isFinite(salsaPct) || !Number.isFinite(chargePct)) {
+        showError("Informe a % da Salsa e a % cobrada do operador.");
+        return;
+      }
+      await api("/integrations/salsa/config", {
+        method: "PUT",
+        body: JSON.stringify({
+          defaultProviderCostPct: salsaPct,
+          defaultOperatorChargePct: chargePct,
+        }),
+      });
+      alert(`Padrão salvo: Salsa ${salsaPct}% · operador ${chargePct}% (vale para todos).`);
+      loadIntegrationsView();
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
   $("#salsa-config-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     showError("");
@@ -850,7 +851,6 @@ function initUi() {
           hashKey: form.hashKey.value || undefined,
           gameListUrl: form.gameListUrl.value || null,
           apiBase: form.apiBase.value || undefined,
-          defaultProviderCostPct: form.defaultProviderCostPct.value !== "" ? Number(form.defaultProviderCostPct.value) : undefined,
         }),
       });
       form.hashKey.value = "";
@@ -868,16 +868,6 @@ function initUi() {
     const search = e.target.value.trim();
     const data = await api("/integrations/salsa/games" + (search ? "?search=" + encodeURIComponent(search) : ""));
     renderSalsaGamesTable(data.games || []);
-  });
-
-  $("#btn-salsa-bulk-cost")?.addEventListener("click", async () => {
-    const providerCostPct = Number($("#salsa-bulk-cost").value);
-    if (!Number.isFinite(providerCostPct)) return alert("Informe repasse %");
-    await api("/integrations/salsa/fees/provider-cost", {
-      method: "POST",
-      body: JSON.stringify({ providerCostPct, integration: "SALSA" }),
-    });
-    loadIntegrationsView();
   });
 
   $("#btn-new-client").addEventListener("click", () => {
@@ -900,9 +890,11 @@ function initUi() {
     showError("");
     const form = e.target;
     const editId = form.dataset.editId;
+    const chargePct = form.chargePct.value !== "" ? Number(form.chargePct.value) : null;
     const body = {
       name: form.name.value,
-      marginPct: Number(form.marginPct.value),
+      chargePct,
+      marginPct: 0,
       billingMode: form.billingMode.value,
       maxCredit: form.maxCredit.value !== "" ? Number(form.maxCredit.value) : null,
       initialBalance: Number(form.initialBalance.value || 0),
@@ -918,7 +910,7 @@ function initUi() {
           method: "PATCH",
           body: JSON.stringify({
             name: body.name,
-            marginPct: body.marginPct,
+            chargePct: body.chargePct,
             billingMode: body.billingMode,
             maxCredit: body.maxCredit,
             rtpPoolMode: body.rtpPoolMode,

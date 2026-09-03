@@ -53,6 +53,7 @@ async function main() {
       gameListUrl: process.env.SALSA_GAME_LIST_URL ?? null,
       apiBase: process.env.SALSA_API_BASE ?? "https://api-test.salsagator.com",
       defaultProviderCostPct: Number(process.env.SALSA_DEFAULT_COST_PCT ?? 6.5),
+      defaultOperatorChargePct: 20,
     },
     update: {},
   });

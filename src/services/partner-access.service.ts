@@ -1,16 +1,23 @@
 import { prisma } from "../lib/prisma.js";
 import { refreshClientEntitlements } from "../entitlements/entitlement.service.js";
+import { getSalsaRuntimeConfig } from "./salsa/salsa-config.service.js";
 
 export async function getPartnerProviderAccess(clientId: string) {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
-    select: { id: true, name: true, marginPct: true, isActive: true },
+    select: { id: true, name: true, marginPct: true, chargePct: true, isActive: true },
   });
   if (!client) return null;
 
+  const cfg = await getSalsaRuntimeConfig();
+  const salsaPct = Number(cfg.defaultProviderCostPct);
+  const defaultChargePct = Number(cfg.defaultOperatorChargePct);
+  const clientChargePct = client.chargePct != null ? Number(client.chargePct) : null;
+  const resolvedChargePct = clientChargePct ?? defaultChargePct;
+
   const providers = await prisma.gameProvider.findMany({
     where: { integration: "SALSA" },
-    select: { id: true, slug: true, name: true, isActive: true, defaultCostPct: true },
+    select: { id: true, slug: true, name: true, isActive: true },
     orderBy: { name: "asc" },
   });
   const providerIds = providers.map((p) => p.id);
@@ -36,15 +43,21 @@ export async function getPartnerProviderAccess(clientId: string) {
   const totalById = new Map(totals.map((row) => [row.providerId, row._count._all]));
   const activeById = new Map(actives.map((row) => [row.providerId, row._count._all]));
   const accessById = new Map(access.map((row) => [row.providerId, row]));
-  const marginPct = Number(client.marginPct);
 
   return {
-    client: { ...client, marginPct },
+    defaults: {
+      salsaPct,
+      operatorChargePct: defaultChargePct,
+    },
+    client: {
+      ...client,
+      marginPct: Number(client.marginPct),
+      chargePct: clientChargePct,
+      resolvedChargePct,
+      yourMarginPct: Math.max(0, Math.round((resolvedChargePct - salsaPct) * 10) / 10),
+    },
     providers: providers.map((p) => {
       const row = accessById.get(p.id);
-      const defaultFee = Number(p.defaultCostPct ?? 6.5);
-      const feePct = row?.feePct != null ? Number(row.feePct) : defaultFee;
-      const chargePct = row?.chargePct != null ? Number(row.chargePct) : feePct + marginPct;
       return {
         providerId: p.id,
         slug: p.slug,
@@ -52,13 +65,7 @@ export async function getPartnerProviderAccess(clientId: string) {
         isActiveGlobal: p.isActive,
         gameCount: totalById.get(p.id) ?? 0,
         activeGameCount: activeById.get(p.id) ?? 0,
-        defaultCostPct: defaultFee,
         isEnabled: row?.isEnabled ?? false,
-        feePct: row?.feePct != null ? Number(row.feePct) : null,
-        chargePct: row?.chargePct != null ? Number(row.chargePct) : null,
-        resolvedFeePct: feePct,
-        resolvedChargePct: chargePct,
-        yourMarginPct: Math.max(0, Math.round((chargePct - feePct) * 10) / 10),
       };
     }),
   };
@@ -66,17 +73,28 @@ export async function getPartnerProviderAccess(clientId: string) {
 
 export async function savePartnerProviderAccess(
   clientId: string,
-  items: Array<{
-    providerId: number;
-    isEnabled: boolean;
-    feePct?: number | null;
+  input: {
     chargePct?: number | null;
-  }>,
+    providers: Array<{ providerId: number; isEnabled: boolean }>;
+  },
 ) {
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
   if (!client) throw new Error("Client not found");
 
-  for (const item of items) {
+  if (input.chargePct !== undefined) {
+    const cfg = await getSalsaRuntimeConfig();
+    const salsaPct = Number(cfg.defaultProviderCostPct);
+    const chargePct = input.chargePct;
+    await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        chargePct,
+        ...(chargePct != null ? { marginPct: Math.max(0, chargePct - salsaPct) } : {}),
+      },
+    });
+  }
+
+  for (const item of input.providers) {
     if (!Number.isInteger(item.providerId) || item.providerId <= 0) continue;
     await prisma.clientProviderAccess.upsert({
       where: { clientId_providerId: { clientId, providerId: item.providerId } },
@@ -84,13 +102,9 @@ export async function savePartnerProviderAccess(
         clientId,
         providerId: item.providerId,
         isEnabled: Boolean(item.isEnabled),
-        feePct: item.feePct ?? null,
-        chargePct: item.chargePct ?? null,
       },
       update: {
         isEnabled: Boolean(item.isEnabled),
-        feePct: item.feePct ?? null,
-        chargePct: item.chargePct ?? null,
       },
     });
   }

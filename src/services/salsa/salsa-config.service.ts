@@ -8,6 +8,7 @@ export interface SalsaRuntimeConfig {
   gameListUrl: string | null;
   apiBase: string;
   defaultProviderCostPct: number;
+  defaultOperatorChargePct: number;
   source: "db" | "env";
 }
 
@@ -26,6 +27,7 @@ export async function getSalsaRuntimeConfig(): Promise<SalsaRuntimeConfig> {
       gameListUrl,
       apiBase,
       defaultProviderCostPct: Number(row.defaultProviderCostPct) || env.SALSA_DEFAULT_COST_PCT,
+      defaultOperatorChargePct: Number(row.defaultOperatorChargePct) || 20,
       source: process.env.SALSA_PN || process.env.SALSA_GAME_LIST_URL ? "env" : "db",
     };
   }
@@ -37,6 +39,7 @@ export async function getSalsaRuntimeConfig(): Promise<SalsaRuntimeConfig> {
     gameListUrl: env.SALSA_GAME_LIST_URL ?? null,
     apiBase: env.SALSA_API_BASE,
     defaultProviderCostPct: env.SALSA_DEFAULT_COST_PCT,
+    defaultOperatorChargePct: 20,
     source: "env",
   };
 }
@@ -48,6 +51,7 @@ export async function upsertSalsaConfig(input: {
   gameListUrl?: string | null;
   apiBase?: string;
   defaultProviderCostPct?: number;
+  defaultOperatorChargePct?: number;
 }) {
   return prisma.salsaIntegrationConfig.upsert({
     where: { id: 1 },
@@ -59,6 +63,7 @@ export async function upsertSalsaConfig(input: {
       gameListUrl: input.gameListUrl ?? null,
       apiBase: input.apiBase ?? env.SALSA_API_BASE,
       defaultProviderCostPct: input.defaultProviderCostPct ?? env.SALSA_DEFAULT_COST_PCT,
+      defaultOperatorChargePct: input.defaultOperatorChargePct ?? 20,
     },
     update: {
       ...(input.enabled !== undefined && { enabled: input.enabled }),
@@ -68,6 +73,9 @@ export async function upsertSalsaConfig(input: {
       ...(input.apiBase !== undefined && { apiBase: input.apiBase }),
       ...(input.defaultProviderCostPct !== undefined && {
         defaultProviderCostPct: input.defaultProviderCostPct,
+      }),
+      ...(input.defaultOperatorChargePct !== undefined && {
+        defaultOperatorChargePct: input.defaultOperatorChargePct,
       }),
     },
   });
@@ -86,6 +94,7 @@ export async function ensureSalsaConfigSeed() {
       gameListUrl: env.SALSA_GAME_LIST_URL ?? null,
       apiBase: env.SALSA_API_BASE,
       defaultProviderCostPct: env.SALSA_DEFAULT_COST_PCT,
+      defaultOperatorChargePct: 20,
     },
   });
 }

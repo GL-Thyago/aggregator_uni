@@ -1,35 +1,21 @@
 import { prisma } from "../lib/prisma.js";
+import { getSalsaRuntimeConfig } from "./salsa/salsa-config.service.js";
 
 export interface ResolvedClientGameFees {
-  /** Repasse ao provedor (Salsa/upstream) — vem de Game.aggregatorFeePct ou override */
+  /** Repasse à Salsa — sempre o % padrão global */
   providerCostPct: number;
   /** Sua margem B2B sobre a aposta */
   clientMarginPct: number;
-  /** Total debitado do operador (provider + margem) */
+  /** Total debitado do operador */
   totalChargePct: number;
-  /** gameFeePct / clientFeePct usados no spin */
   gameFeePct: number;
   clientFeePct: number;
-  /** chargePct explícito no entitlement, se houver */
   chargePctOverride: number | null;
 }
 
-async function findEntitlement(clientId: string, gameId: number, categoryId: number) {
-  const specific = await prisma.clientEntitlement.findFirst({
-    where: { clientId, gameId, isEnabled: true },
-    select: { feePct: true, chargePct: true },
-  });
-  if (specific) return specific;
-
-  return prisma.clientEntitlement.findFirst({
-    where: { clientId, categoryId, gameId: null, isEnabled: true },
-    select: { feePct: true, chargePct: true },
-  });
-}
-
 /**
- * Repasse Salsa = Game.aggregatorFeePct (ou entitlement.feePct override).
- * Cobrança cliente = entitlement.chargePct OU marginPct do client + repasse.
+ * Salsa % = padrão global (um valor para todos).
+ * Cobrança operador = override do cliente, senão o padrão global.
  */
 export async function resolveClientGameFees(input: {
   clientId: string;
@@ -39,37 +25,22 @@ export async function resolveClientGameFees(input: {
   defaultProviderCostPct: number;
   defaultClientMarginPct: number;
 }): Promise<ResolvedClientGameFees> {
-  const [entitlement, providerAccess] = await Promise.all([
-    findEntitlement(input.clientId, input.gameId, input.categoryId),
-    input.providerId
-      ? prisma.clientProviderAccess.findUnique({
-          where: {
-            clientId_providerId: { clientId: input.clientId, providerId: input.providerId },
-          },
-          select: { feePct: true, chargePct: true },
-        })
-      : Promise.resolve(null),
+  const [cfg, client] = await Promise.all([
+    getSalsaRuntimeConfig(),
+    prisma.client.findUnique({
+      where: { id: input.clientId },
+      select: { chargePct: true, marginPct: true },
+    }),
   ]);
 
-  const feeSource = entitlement?.feePct ?? providerAccess?.feePct;
-  const chargeSource = entitlement?.chargePct ?? providerAccess?.chargePct;
-
-  const providerCostPct =
-    feeSource !== null && feeSource !== undefined ? Number(feeSource) : input.defaultProviderCostPct;
+  const providerCostPct = Number(cfg.defaultProviderCostPct) || input.defaultProviderCostPct;
+  const globalCharge = Number(cfg.defaultOperatorChargePct) || roundPct(providerCostPct + input.defaultClientMarginPct);
 
   const chargeOverride =
-    chargeSource !== null && chargeSource !== undefined ? Number(chargeSource) : null;
+    client?.chargePct !== null && client?.chargePct !== undefined ? Number(client.chargePct) : null;
 
-  let clientMarginPct: number;
-  let totalChargePct: number;
-
-  if (chargeOverride !== null) {
-    totalChargePct = chargeOverride;
-    clientMarginPct = Math.max(0, roundPct(chargeOverride - providerCostPct));
-  } else {
-    clientMarginPct = input.defaultClientMarginPct;
-    totalChargePct = roundPct(providerCostPct + clientMarginPct);
-  }
+  const totalChargePct = chargeOverride ?? globalCharge;
+  const clientMarginPct = Math.max(0, roundPct(totalChargePct - providerCostPct));
 
   return {
     providerCostPct,

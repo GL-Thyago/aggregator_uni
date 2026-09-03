@@ -14,6 +14,7 @@ router.use(adminMiddleware);
 const createClientSchema = z.object({
   name: z.string().min(2),
   marginPct: z.number().min(0).max(50).default(0),
+  chargePct: z.number().min(0).max(50).nullable().optional(),
   billingMode: z.enum(["PREPAID", "POSTPAID"]).default("PREPAID"),
   maxCredit: z.number().min(0).nullable().optional(),
   initialBalance: z.number().min(0).default(0),
@@ -47,6 +48,7 @@ router.post("/clients", async (req, res) => {
       name: parsed.data.name,
       apiKeyHash,
       marginPct: parsed.data.marginPct,
+      chargePct: parsed.data.chargePct ?? null,
       billingMode: parsed.data.billingMode,
       maxCredit: parsed.data.maxCredit ?? null,
       rtpPoolMode: parsed.data.rtpPoolMode,
@@ -248,10 +250,11 @@ const createGameSchema = z.object({
 
 router.patch("/clients/:id", async (req, res) => {
   const clientId = req.params.id!;
-  const { isActive, marginPct, name, walletUrl, walletSecret, rtpPoolMode, billingMode, maxCredit, launchEnvironment } =
+  const { isActive, marginPct, chargePct, name, walletUrl, walletSecret, rtpPoolMode, billingMode, maxCredit, launchEnvironment } =
     req.body as {
       isActive?: boolean;
       marginPct?: number;
+      chargePct?: number | null;
       name?: string;
       walletUrl?: string | null;
       walletSecret?: string | null;
@@ -266,6 +269,7 @@ router.patch("/clients/:id", async (req, res) => {
     data: {
       ...(isActive !== undefined && { isActive }),
       ...(marginPct !== undefined && { marginPct }),
+      ...(chargePct !== undefined && { chargePct }),
       ...(name !== undefined && { name }),
       ...(walletUrl !== undefined && { walletUrl }),
       ...(walletSecret !== undefined && { walletSecret }),
@@ -513,13 +517,12 @@ router.get("/clients/:id/partner-access", async (req, res) => {
 router.put("/clients/:id/partner-access", async (req, res) => {
   const parsed = z
     .object({
+      chargePct: z.number().min(0).max(50).nullable().optional(),
       providers: z
         .array(
           z.object({
             providerId: z.number().int(),
             isEnabled: z.boolean(),
-            feePct: z.number().min(0).max(50).nullable().optional(),
-            chargePct: z.number().min(0).max(50).nullable().optional(),
           }),
         )
         .min(1),
@@ -531,7 +534,12 @@ router.put("/clients/:id/partner-access", async (req, res) => {
   }
   try {
     const { savePartnerProviderAccess } = await import("../../../services/partner-access.service.js");
-    res.json(await savePartnerProviderAccess(req.params.id!, parsed.data.providers));
+    res.json(
+      await savePartnerProviderAccess(req.params.id!, {
+        chargePct: parsed.data.chargePct,
+        providers: parsed.data.providers,
+      }),
+    );
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Save failed" });
   }
@@ -606,10 +614,16 @@ router.put("/integrations/salsa/config", async (req, res) => {
     gameListUrl?: string | null;
     apiBase?: string;
     defaultProviderCostPct?: number;
+    defaultOperatorChargePct?: number;
   };
 
   const row = await upsertSalsaConfig(body);
-  res.json(serializeBigInt(row));
+  let applied = null;
+  if (body.defaultProviderCostPct != null && Number.isFinite(body.defaultProviderCostPct)) {
+    const { applyGlobalSalsaCost } = await import("../../../services/salsa/salsa-sync.service.js");
+    applied = await applyGlobalSalsaCost(body.defaultProviderCostPct);
+  }
+  res.json(serializeBigInt({ ...row, applied }));
 });
 
 router.get("/integrations/salsa/games", async (req, res) => {

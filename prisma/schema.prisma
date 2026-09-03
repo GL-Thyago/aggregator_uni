@@ -63,8 +63,10 @@ model Client {
   name         String
   apiKeyHash   String   @unique @map("api_key_hash")
   isActive     Boolean  @default(true) @map("is_active")
-  /// Taxa B2B cobrada do operador sobre cada aposta (%)
+  /// Taxa B2B cobrada do operador sobre cada aposta (%) — legado; a cobrança efetiva é chargePct ou o padrão global
   marginPct    Decimal  @default(0) @map("margin_pct") @db.Decimal(5, 2)
+  /// Override da cobrança total deste operador (%). Null = usa o padrão global (Salsa config)
+  chargePct    Decimal? @map("charge_pct") @db.Decimal(5, 2)
   billingMode  BillingMode @default(PREPAID) @map("billing_mode")
   /// Limite de crédito negativo (pós-pago). Null = sem limite explícito.
   maxCredit    Decimal? @map("max_credit") @db.Decimal(18, 2)
@@ -334,6 +336,8 @@ model SalsaIntegrationConfig {
   gameListUrl            String?  @map("game_list_url")
   apiBase                String   @default("https://api-test.salsagator.com") @map("api_base")
   defaultProviderCostPct Decimal  @default(6.5) @map("default_provider_cost_pct") @db.Decimal(5, 2)
+  /// % cobrada de todos os operadores, até um cliente ter chargePct próprio
+  defaultOperatorChargePct Decimal @default(20) @map("default_operator_charge_pct") @db.Decimal(5, 2)
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@map("salsa_integration_config")

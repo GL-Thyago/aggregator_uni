@@ -1009,6 +1009,15 @@ export async function bulkSetProviderCost(input: {
   return { gamesUpdated: result.count, providerCostPct: input.providerCostPct };
 }
 
+/** Aplica o % Salsa padrão a todos os provedores/jogos Salsa. */
+export async function applyGlobalSalsaCost(costPct: number) {
+  await prisma.gameProvider.updateMany({
+    where: { integration: "SALSA" },
+    data: { defaultCostPct: costPct },
+  });
+  return bulkSetProviderCost({ providerCostPct: costPct, integration: "SALSA" });
+}
+
 type SalsaSyncJob = {
   running: boolean;
   phase: string;

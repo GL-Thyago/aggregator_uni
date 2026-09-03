@@ -93,7 +93,7 @@
           <h3 id="client-form-title">Novo cliente</h3>
           <form id="client-form" class="form-grid">
             <label>Nome<input name="name" required></label>
-            <label>Margem B2B (%)<input name="marginPct" type="number" step="0.1" value="5"></label>
+            <label>Cobrança deste sócio (%)<input name="chargePct" type="number" step="0.1" placeholder="vazio = padrão de todos"></label>
             <label>Cobrança
               <select name="billingMode">
                 <option value="PREPAID">Pré-pago</option>
@@ -156,11 +156,17 @@
               <option value="">Escolha o cliente</option>
             </select>
           </div>
-          <p class="hint">Liberar provedor e definir comissão <strong>só para este cassino</strong>. O provedor também precisa estar ativo em Integrações — senão o lobby continua vazio.</p>
+          <p class="hint">A % da Salsa é a mesma para todos (definida em Integrações). Aqui você libera o provedor e, se precisar, altera só a <strong>cobrança deste cliente</strong>.</p>
           <div class="cards" id="partner-summary"></div>
+          <div id="partner-charge-box" class="inline-form hidden">
+            <label>Cobrança deste sócio %
+              <input id="partner-charge-override" type="number" step="0.1" placeholder="padrão de todos">
+            </label>
+            <p class="hint" id="partner-charge-hint" style="margin:0"></p>
+          </div>
           <div class="table-wrap" id="partner-providers-table"></div>
           <div class="inline-form">
-            <button type="button" id="btn-save-partner-access" disabled>Salvar acesso e comissões</button>
+            <button type="button" id="btn-save-partner-access" disabled>Salvar acesso e cobrança</button>
           </div>
         </div>
       </section>
@@ -187,22 +193,33 @@
       <!-- Integrações -->
       <section id="view-integrations" class="view hidden">
         <div class="panel">
+          <h3>Comissões padrão</h3>
+          <p class="hint">Estes dois valores valem para <strong>todos</strong> os jogos e sócios. Na aba Sócios você só altera a cobrança de um cliente específico.</p>
+          <form id="commission-defaults-form" class="inline-form">
+            <label>% da Salsa (repasse)
+              <input name="defaultProviderCostPct" type="number" step="0.1" min="0" max="50" required>
+            </label>
+            <label>% cobrada do operador
+              <input name="defaultOperatorChargePct" type="number" step="0.1" min="0" max="50" required>
+            </label>
+            <button type="submit">Salvar % para todos</button>
+          </form>
+        </div>
+        <div class="panel">
           <h3>Salsa Technology</h3>
           <p class="hint">Este formulário é o ambiente de <strong>TESTE</strong> (staging). Produção fica no EasyPanel: <code>SALSA_PN_LIVE</code> + <code>SALSA_HASH_KEY_LIVE</code>. O seletor no topo da página é o <strong>cassino</strong>, não o ambiente Salsa. Cada cliente escolhe Teste ou Produção na aba Clientes.</p>
           <div id="salsa-status" class="cards"></div>
           <div class="inline-form">
             <button id="btn-salsa-sync">Importar jogos do JSON Salsa</button>
             <button id="btn-salsa-deactivate" class="ghost danger">Desativar todo o catálogo Salsa</button>
-            <input id="salsa-default-cost" type="number" step="0.1" placeholder="Repasse padrão % (só jogos novos)" style="width:220px">
           </div>
-          <p class="hint">O import só atualiza nomes, IDs e capas. <strong>Não liga jogos</strong>. Depois: Integrações → ativar um provedor → Sócios → liberar e pôr a comissão.</p>
+          <p class="hint">O import só atualiza nomes, IDs e capas. <strong>Não liga jogos</strong>. Depois: Integrações → ativar um provedor → Sócios → liberar.</p>
           <form id="salsa-config-form" class="form-grid" style="margin-top:1rem">
             <label><input type="checkbox" name="enabled"> Salsa ativa</label>
             <label>PN teste (staging)<input name="publisherName" placeholder="rg-games-staging"></label>
             <label>Hash Key teste<input name="hashKey" type="password" placeholder="deixe vazio para manter"></label>
             <label>URL JSON teste<input name="gameListUrl" type="url" placeholder="https://back-test.patagoniaentertainment.com/..."></label>
             <label>API Base teste<input name="apiBase" placeholder="https://api-test.salsagator.com"></label>
-            <label>Repasse padrão %<input name="defaultProviderCostPct" type="number" step="0.1"></label>
             <div class="full actions"><button type="submit">Salvar config Salsa</button></div>
           </form>
           <pre id="salsa-config-pre" class="config-pre"></pre>
@@ -218,12 +235,10 @@
         </div>
         <div class="panel">
           <h3>Jogos Salsa / terceiros importados</h3>
-          <p class="hint">Ex.: Tigrinho repasse 5% · Banca X cobrada 20% (15% sua margem) — configure repasse aqui e cobrança por cliente na aba Clientes.</p>
+          <p class="hint">A % da Salsa é a padrão global. Use Ligar/Desligar por jogo se quiser um título específico.</p>
           <div class="inline-form">
             <input id="salsa-games-search" type="search" placeholder="Buscar jogo...">
             <button id="btn-salsa-games-refresh" class="ghost">Atualizar</button>
-            <label>Repasse em lote %<input id="salsa-bulk-cost" type="number" step="0.1" style="width:80px"></label>
-            <button id="btn-salsa-bulk-cost">Aplicar a todos Salsa</button>
           </div>
           <div class="table-wrap" id="salsa-games-table"></div>
         </div>
