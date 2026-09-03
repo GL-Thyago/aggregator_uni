@@ -10,10 +10,19 @@ ENV NPM_CONFIG_FETCH_RETRIES=8 \
     NPM_CONFIG_FETCH_RETRY_FACTOR=2 \
     NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
     NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
-    NPM_CONFIG_FETCH_TIMEOUT=300000
+    NPM_CONFIG_FETCH_TIMEOUT=300000 \
+    NPM_CONFIG_MAXSOCKETS=3 \
+    NODE_OPTIONS=--dns-result-order=ipv4first
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN set -eux; \
+  ok=0; \
+  for i in 1 2 3 4 5; do \
+    if npm ci --no-audit --no-fund; then ok=1; break; fi; \
+    echo "npm ci failed (attempt $${i}), retrying in a few seconds..."; \
+    sleep $((i * 8)); \
+  done; \
+  test "$$ok" = "1"
 
 COPY prisma ./prisma
 COPY prisma.config.ts tsconfig.json ./

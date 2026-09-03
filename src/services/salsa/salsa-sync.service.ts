@@ -922,7 +922,16 @@ export async function applyProviderCostToGames(providerId: number, costPct: numb
   });
 }
 
-export async function listSalsaGames(options?: { providerId?: number; search?: string; activeOnly?: boolean }) {
+export async function listSalsaGames(options?: {
+  providerId?: number;
+  search?: string;
+  activeOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+}) {
+  const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 40));
+  const page = Math.max(1, options?.page ?? 1);
+
   const providers = await prisma.gameProvider.findMany({
     where: {
       integration: "SALSA",
@@ -932,26 +941,33 @@ export async function listSalsaGames(options?: { providerId?: number; search?: s
   });
 
   const providerIds = providers.map((p) => p.id);
-  if (!providerIds.length) return { providers: [], games: [], total: 0 };
+  if (!providerIds.length) return { providers: [], games: [], total: 0, page, pageSize };
 
-  const games = await prisma.game.findMany({
-    where: {
-      providerId: { in: providerIds },
-      ...(options?.activeOnly && { isActive: true }),
-      ...(options?.search && {
-        OR: [
-          { name: { contains: options.search, mode: "insensitive" } },
-          { slug: { contains: options.search, mode: "insensitive" } },
-          { externalGameId: { contains: options.search, mode: "insensitive" } },
-        ],
-      }),
-    },
-    include: {
-      provider: { select: { id: true, slug: true, name: true, integration: true } },
-      category: { select: { id: true, slug: true, name: true } },
-    },
-    orderBy: [{ providerId: "asc" }, { name: "asc" }],
-  });
+  const where = {
+    providerId: { in: providerIds },
+    ...(options?.activeOnly && { isActive: true }),
+    ...(options?.search && {
+      OR: [
+        { name: { contains: options.search, mode: "insensitive" as const } },
+        { slug: { contains: options.search, mode: "insensitive" as const } },
+        { externalGameId: { contains: options.search, mode: "insensitive" as const } },
+      ],
+    }),
+  };
+
+  const [total, games] = await Promise.all([
+    prisma.game.count({ where }),
+    prisma.game.findMany({
+      where,
+      include: {
+        provider: { select: { id: true, slug: true, name: true, integration: true } },
+        category: { select: { id: true, slug: true, name: true } },
+      },
+      orderBy: [{ providerId: "asc" }, { name: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
 
   return {
     providers,
@@ -967,7 +983,9 @@ export async function listSalsaGames(options?: { providerId?: number; search?: s
       provider: g.provider,
       category: g.category,
     })),
-    total: games.length,
+    total,
+    page,
+    pageSize,
   };
 }
 

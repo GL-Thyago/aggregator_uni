@@ -9,6 +9,7 @@ const state = {
   categories: [],
   selectedClientId: "",
   detailClientId: null,
+  salsaGamesPage: 1,
   charts: {},
 };
 
@@ -463,14 +464,22 @@ async function loadRevenueView() {
   }
 }
 
-function renderSalsaGamesTable(games) {
+function renderSalsaGamesTable(data) {
+  const games = data.games || [];
+  const total = data.total ?? games.length;
+  const page = data.page || 1;
+  const pageSize = data.pageSize || 40;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  state.salsaGamesPage = page;
+
   if (!games.length) {
     $("#salsa-games-table").innerHTML = "<p class='hint'>Nenhum jogo importado. Clique em Importar jogos.</p>";
+    $("#salsa-games-pager").innerHTML = "";
     return;
   }
   $("#salsa-games-table").innerHTML = `<table>
     <thead><tr>
-      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>Status</th><th></th>
+      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>Status</th><th>Ações</th>
     </tr></thead>
     <tbody>${games.map((g) => `
       <tr data-game-id="${g.id}">
@@ -488,17 +497,35 @@ function renderSalsaGamesTable(games) {
     const id = btn.dataset.id;
     const next = btn.dataset.active !== "true";
     await api(`/games/${id}`, { method: "PATCH", body: JSON.stringify({ isActive: next }) });
-    loadIntegrationsView();
+    loadSalsaGamesPage(state.salsaGamesPage);
   }));
+
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  $("#salsa-games-pager").innerHTML = `
+    <span class="pager-info">${from}–${to} de ${total}</span>
+    <button type="button" class="ghost" id="salsa-page-prev" ${page <= 1 ? "disabled" : ""}>Anterior</button>
+    <span>Pág. ${page} / ${pages}</span>
+    <button type="button" class="ghost" id="salsa-page-next" ${page >= pages ? "disabled" : ""}>Próxima</button>
+  `;
+  $("#salsa-page-prev")?.addEventListener("click", () => loadSalsaGamesPage(page - 1));
+  $("#salsa-page-next")?.addEventListener("click", () => loadSalsaGamesPage(page + 1));
+}
+
+async function loadSalsaGamesPage(page = state.salsaGamesPage) {
+  const search = ($("#salsa-games-search")?.value || "").trim();
+  const q = new URLSearchParams({ page: String(Math.max(1, page)), pageSize: "40" });
+  if (search) q.set("search", search);
+  const data = await api("/integrations/salsa/games?" + q.toString());
+  renderSalsaGamesTable(data);
 }
 
 async function loadIntegrationsView() {
   showError("");
   try {
-    const [salsa, providers, salsaGames, salsaCfg] = await Promise.all([
+    const [salsa, providers, salsaCfg] = await Promise.all([
       api("/integrations/salsa/status"),
       api("/providers"),
-      api("/integrations/salsa/games"),
       api("/integrations/salsa/config").catch(() => null),
     ]);
 
@@ -540,7 +567,7 @@ API live: https://api.salsagator.com
 # Quem usa teste ou live: aba Clientes → Ambiente do cassino
 # Publicar 5069 jogos não muda o PN. Só libera o catálogo.`;
 
-    renderSalsaGamesTable(salsaGames.games || []);
+    await loadSalsaGamesPage(state.salsaGamesPage);
 
     $("#providers-table").innerHTML = `<table>
       <thead><tr>
@@ -860,14 +887,12 @@ function initUi() {
     }
   });
 
-  $("#btn-salsa-games-refresh")?.addEventListener("click", loadIntegrationsView);
+  $("#btn-salsa-games-refresh")?.addEventListener("click", () => loadSalsaGamesPage(1));
 
-  $("#salsa-games-search")?.addEventListener("keydown", async (e) => {
+  $("#salsa-games-search")?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const search = e.target.value.trim();
-    const data = await api("/integrations/salsa/games" + (search ? "?search=" + encodeURIComponent(search) : ""));
-    renderSalsaGamesTable(data.games || []);
+    loadSalsaGamesPage(1);
   });
 
   $("#btn-new-client").addEventListener("click", () => {

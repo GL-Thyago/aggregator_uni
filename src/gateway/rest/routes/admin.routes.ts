@@ -631,7 +631,9 @@ router.get("/integrations/salsa/games", async (req, res) => {
   const providerId = req.query.providerId ? Number(req.query.providerId) : undefined;
   const search = req.query.search ? String(req.query.search) : undefined;
   const activeOnly = req.query.activeOnly === "1" || req.query.activeOnly === "true";
-  res.json(await listSalsaGames({ providerId, search, activeOnly }));
+  const page = req.query.page ? Number(req.query.page) : 1;
+  const pageSize = req.query.pageSize ? Number(req.query.pageSize) : 40;
+  res.json(await listSalsaGames({ providerId, search, activeOnly, page, pageSize }));
 });
 
 router.post("/integrations/salsa/fees/provider-cost", async (req, res) => {
