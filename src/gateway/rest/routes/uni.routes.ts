@@ -10,9 +10,8 @@ import {
   type UniEnvironment,
 } from "../../../config/uni.js";
 import {
+  canClientAccessGame,
   getAllowedGameIds,
-  isGameEntitled,
-  loadClientEntitlements,
 } from "../../../entitlements/entitlement.service.js";
 import { serializeBigInt } from "../../../lib/utils.js";
 import { getGameBySlug } from "../../../services/game.service.js";
@@ -47,8 +46,7 @@ async function launchInEnvironment(
     return;
   }
 
-  const entitlements = await loadClientEntitlements(req.client!.id);
-  if (!isGameEntitled(entitlements, game.categoryId, game.id)) {
+  if (!(await canClientAccessGame(req.client!.id, game))) {
     res.status(403).json({ error: "Game not entitled for this client" });
     return;
   }

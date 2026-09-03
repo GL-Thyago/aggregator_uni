@@ -6,10 +6,9 @@ import {
   revokeRefreshToken,
 } from "../../../auth/auth.service.js";
 import {
+  canClientAccessGame,
   getAllowedGameIds,
   getEntitledGamesTree,
-  isGameEntitled,
-  loadClientEntitlements,
 } from "../../../entitlements/entitlement.service.js";
 import { authMiddleware, sessionMiddleware, type AuthenticatedRequest } from "../../../auth/middleware.js";
 import { serializeBigInt } from "../../../lib/utils.js";
@@ -123,8 +122,7 @@ router.get("/games/:slug", authMiddleware, async (req: AuthenticatedRequest, res
     return;
   }
 
-  const entitlements = await loadClientEntitlements(req.client!.id);
-  if (!isGameEntitled(entitlements, game.categoryId, game.id)) {
+  if (!(await canClientAccessGame(req.client!.id, game))) {
     res.status(403).json({ error: "Game not entitled for this client" });
     return;
   }
@@ -157,8 +155,7 @@ router.post("/games/:slug/launch", authMiddleware, async (req: AuthenticatedRequ
     return;
   }
 
-  const entitlements = await loadClientEntitlements(req.client!.id);
-  if (!isGameEntitled(entitlements, game.categoryId, game.id)) {
+  if (!(await canClientAccessGame(req.client!.id, game))) {
     res.status(403).json({ error: "Game not entitled for this client" });
     return;
   }

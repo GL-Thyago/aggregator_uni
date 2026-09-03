@@ -48,6 +48,28 @@ export async function refreshClientEntitlements(clientId: string): Promise<void>
 }
 
 export async function getAllowedGameIds(clientId: string): Promise<number[]> {
+  const accessRows = await prisma.clientProviderAccess.findMany({
+    where: { clientId },
+    select: { providerId: true, isEnabled: true },
+  });
+
+  if (accessRows.length) {
+    const allowedProviderIds = accessRows.filter((row) => row.isEnabled).map((row) => row.providerId);
+    if (!allowedProviderIds.length) return [];
+
+    const games = await prisma.game.findMany({
+      where: {
+        isActive: true,
+        engine: "EXTERNAL",
+        externalGameId: { not: null },
+        providerId: { in: allowedProviderIds },
+        provider: { isActive: true, integration: "SALSA" },
+      },
+      select: { id: true },
+    });
+    return games.map((g) => g.id);
+  }
+
   const rows = await prisma.clientEntitlement.findMany({
     where: { clientId, isEnabled: true },
     select: { categoryId: true, gameId: true },
@@ -74,6 +96,23 @@ export async function getAllowedGameIds(clientId: string): Promise<number[]> {
   }
 
   return [...new Set(gameIds)];
+}
+
+export async function canClientAccessGame(
+  clientId: string,
+  game: { id: number; categoryId: number; providerId: number; provider?: { integration?: string } },
+): Promise<boolean> {
+  const accessRows = await prisma.clientProviderAccess.findMany({
+    where: { clientId },
+    select: { providerId: true, isEnabled: true },
+  });
+
+  if (accessRows.length) {
+    return accessRows.some((row) => row.providerId === game.providerId && row.isEnabled);
+  }
+
+  const entitlements = await loadClientEntitlements(clientId);
+  return isGameEntitled(entitlements, game.categoryId, game.id);
 }
 
 /** Libera categorias (wildcard) para todos os operadores ativos — jogos novos passam a aparecer no catálogo. */

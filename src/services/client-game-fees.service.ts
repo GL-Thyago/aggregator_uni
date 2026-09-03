@@ -35,20 +35,30 @@ export async function resolveClientGameFees(input: {
   clientId: string;
   gameId: number;
   categoryId: number;
+  providerId?: number;
   defaultProviderCostPct: number;
   defaultClientMarginPct: number;
 }): Promise<ResolvedClientGameFees> {
-  const entitlement = await findEntitlement(input.clientId, input.gameId, input.categoryId);
+  const [entitlement, providerAccess] = await Promise.all([
+    findEntitlement(input.clientId, input.gameId, input.categoryId),
+    input.providerId
+      ? prisma.clientProviderAccess.findUnique({
+          where: {
+            clientId_providerId: { clientId: input.clientId, providerId: input.providerId },
+          },
+          select: { feePct: true, chargePct: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const feeSource = entitlement?.feePct ?? providerAccess?.feePct;
+  const chargeSource = entitlement?.chargePct ?? providerAccess?.chargePct;
 
   const providerCostPct =
-    entitlement?.feePct !== null && entitlement?.feePct !== undefined
-      ? Number(entitlement.feePct)
-      : input.defaultProviderCostPct;
+    feeSource !== null && feeSource !== undefined ? Number(feeSource) : input.defaultProviderCostPct;
 
   const chargeOverride =
-    entitlement?.chargePct !== null && entitlement?.chargePct !== undefined
-      ? Number(entitlement.chargePct)
-      : null;
+    chargeSource !== null && chargeSource !== undefined ? Number(chargeSource) : null;
 
   let clientMarginPct: number;
   let totalChargePct: number;

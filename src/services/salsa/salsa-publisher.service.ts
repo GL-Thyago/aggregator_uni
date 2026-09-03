@@ -382,6 +382,7 @@ async function handlePlaceBet(params: Record<string, string>) {
     clientId: session.clientId,
     gameId: session.game.id,
     categoryId: session.game.categoryId,
+    providerId: session.game.providerId,
     defaultProviderCostPct: Number(session.game.aggregatorFeePct),
     defaultClientMarginPct: Number(session.client.marginPct),
   });

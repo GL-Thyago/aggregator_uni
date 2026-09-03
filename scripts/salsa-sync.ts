@@ -10,8 +10,8 @@ async function main() {
     process.exit(1);
   }
 
-  const result = await syncSalsaGamesFromSource({ activateProvider: true });
-  console.log("\nSync concluído:");
+  const result = await syncSalsaGamesFromSource();
+  console.log("\nSync concluído (catálogo atualizado, nada foi ligado):");
   console.log(`  Provedores: ${result.providerNames?.join(", ") || result.providers}`);
   console.log(`  IDs Salsa: ${(result.providerIds ?? []).join(", ")}`);
   console.log(`  Criados: ${result.created}  Atualizados: ${result.updated}`);
@@ -25,7 +25,7 @@ async function main() {
   if (!(result.logosFromUrl || result.logosFromBase64)) {
     console.log("  Aviso: o JSON desta conta não trouxe gameLogo/gameLogoUrl — as capas só aparecem quando a Salsa enviar BASE64 ou URL.");
   }
-  console.log("Catálogo ativado e liberado para os operadores.");
+  console.log("Ative um provedor no ADM e liberte no Sócios.");
 }
 
 void main().catch((e) => {

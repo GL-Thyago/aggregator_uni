@@ -98,7 +98,7 @@ interface SalsaProviderJson {
 }
 
 const CATALOG_CACHE_PATH = path.resolve(process.cwd(), "data", "salsa-catalog-cache.json");
-const SCAN_CONCURRENCY = 4;
+const SCAN_CONCURRENCY = 8;
 /** Estúdios fora da faixa baixa (TaDa live = 331). Sem isto o JSON existe mas o cassino fica vazio. */
 const EXTRA_SALSA_PROVIDER_IDS = [331];
 
@@ -213,7 +213,7 @@ async function fetchSalsaProviderPage(
     const { data, status } = await axios.get<{ data?: { providers?: SalsaProviderJson[] }; error?: string }>(
       url.toString(),
       {
-        timeout: 120_000,
+        timeout: 12_000,
         maxContentLength: 80 * 1024 * 1024,
         maxBodyLength: 80 * 1024 * 1024,
         validateStatus: (s) => s < 500,
@@ -233,7 +233,10 @@ async function fetchSalsaProviderPage(
 /** A Salsa exige `provider=N` por request. Sem o param a API devolve 400.
  *  IDs não são contínuos (PG Soft=42, Evolution=126…). Parar nos primeiros 400
  *  deixa o cassino só com os estúdios da Salsa. A API também trava 24h após um dump. */
-export async function fetchAllSalsaProviders(rawUrl: string): Promise<SalsaCatalogSnapshot> {
+export async function fetchAllSalsaProviders(
+  rawUrl: string,
+  onProgress?: (info: { phase: string; scanned: number; found: number }) => void,
+): Promise<SalsaCatalogSnapshot> {
   const base = catalogBaseUrl(rawUrl);
   const bySlug = new Map<string, SalsaProviderJson>();
   const foundIds: number[] = [];
@@ -258,6 +261,7 @@ export async function fetchAllSalsaProviders(rawUrl: string): Promise<SalsaCatal
   for (const id of extraIds) {
     if (rateLimited) break;
     await ingest(id);
+    onProgress?.({ phase: `provedor ${id} (TaDa/extra)`, scanned, found: foundIds.length });
   }
 
   for (let start = 1; start <= maxId && !rateLimited; start += SCAN_CONCURRENCY) {
@@ -276,6 +280,11 @@ export async function fetchAllSalsaProviders(rawUrl: string): Promise<SalsaCatal
       mergeProviderPage(bySlug, page.providers, page.id);
     }
     if (batchLimited) rateLimited = batchLimited;
+    onProgress?.({
+      phase: `a varrer providers ${start}–${Math.min(start + SCAN_CONCURRENCY - 1, maxId)}`,
+      scanned,
+      found: foundIds.length,
+    });
   }
 
   const snapshot: SalsaCatalogSnapshot = {
@@ -318,9 +327,12 @@ export async function getSalsaIntegrationStatus() {
     select: { id: true, isActive: true },
   });
   const providerIds = salsaProviders.map((p) => p.id);
-  const gameCount = providerIds.length
-    ? await prisma.game.count({ where: { providerId: { in: providerIds } } })
-    : 0;
+  const [gameCount, gamesActive] = providerIds.length
+    ? await Promise.all([
+        prisma.game.count({ where: { providerId: { in: providerIds } } }),
+        prisma.game.count({ where: { providerId: { in: providerIds }, isActive: true } }),
+      ])
+    : [0, 0];
 
   return {
     enabled: env.SALSA_ENABLED,
@@ -351,6 +363,7 @@ export async function getSalsaIntegrationStatus() {
     },
     providerActive: salsaProviders.some((p) => p.isActive),
     gamesImported: gameCount,
+    gamesActive,
     missing: [
       !env.SALSA_PN && "SALSA_PN",
       !env.SALSA_HASH_KEY && "SALSA_HASH_KEY",
@@ -371,20 +384,14 @@ export async function hideNonSalsaCatalog() {
     data: { isActive: false },
   });
   await ensureGpiValidationGame();
-  await ensureOssProductionGames();
 }
 
 /** Jogo de certificação GPI da Salsa (`game=gpi-validation`). */
 export async function ensureGpiValidationGame() {
-  const provider = await prisma.gameProvider.findFirst({
-    where: { OR: [{ slug: "salsa" }, { integration: "SALSA" }] },
-    orderBy: { id: "asc" },
-  });
-  if (!provider) return null;
-
-  await prisma.gameProvider.update({
-    where: { id: provider.id },
-    data: { isActive: true, integration: "SALSA" },
+  const provider = await prisma.gameProvider.upsert({
+    where: { slug: "salsa" },
+    create: { slug: "salsa", name: "Salsa", integration: "SALSA", isActive: true },
+    update: { integration: "SALSA", isActive: true },
   });
 
   const category = await prisma.gameCategory.upsert({
@@ -625,9 +632,13 @@ export function normalizeSalsaLaunchGame(raw: {
 }
 
 /** Cadastra IDs Salsa (e-mail OPS) sem novo deploy. */
-export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
+export async function upsertSalsaLaunchGames(
+  items: SalsaLaunchGameInput[],
+  options?: { activate?: boolean },
+) {
   const created: string[] = [];
   const updated: string[] = [];
+  const activate = options?.activate === true;
 
   for (const item of items) {
     const provider = await prisma.gameProvider.upsert({
@@ -636,9 +647,13 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
         slug: item.providerSlug,
         name: item.providerName,
         integration: "SALSA",
-        isActive: true,
+        isActive: activate,
       },
-      update: { name: item.providerName, integration: "SALSA", isActive: true },
+      update: {
+        name: item.providerName,
+        integration: "SALSA",
+        ...(activate ? { isActive: true } : {}),
+      },
     });
 
     const category = await prisma.gameCategory.upsert({
@@ -662,7 +677,7 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
           name: item.name,
           engine: "EXTERNAL",
           externalGameId: item.code,
-          isActive: true,
+          ...(activate ? { isActive: true } : {}),
           providerId: provider.id,
           categoryId: category.id,
           gameType: item.gameType,
@@ -680,7 +695,7 @@ export async function upsertSalsaLaunchGames(items: SalsaLaunchGameInput[]) {
           gameType: item.gameType,
           engine: "EXTERNAL",
           externalGameId: item.code,
-          isActive: true,
+          isActive: activate,
           thumbnailUrl: item.thumbnailUrl ?? null,
         },
       });
@@ -699,7 +714,9 @@ export async function syncSalsaGamesFromSource(options?: {
   gameListUrl?: string;
   activateProvider?: boolean;
   defaultCostPct?: number;
+  onProgress?: (info: { phase: string; scanned?: number; found?: number }) => void;
 }) {
+  options?.onProgress?.({ phase: "a ligar à Salsa…" });
   await hideNonSalsaCatalog();
 
   const cfg = await getSalsaRuntimeConfig();
@@ -708,7 +725,7 @@ export async function syncSalsaGamesFromSource(options?: {
     throw new Error("SALSA_GAME_LIST_URL não configurada — peça a URL do JSON à Salsa");
   }
 
-  const catalog = await fetchAllSalsaProviders(url);
+  const catalog = await fetchAllSalsaProviders(url, options?.onProgress);
   const providers = catalog.providers;
   if (!providers.length) {
     if (catalog.rateLimited) {
@@ -733,6 +750,11 @@ export async function syncSalsaGamesFromSource(options?: {
   let logosFromUrl = 0;
   let logosFromBase64 = 0;
 
+  options?.onProgress?.({
+    phase: `a gravar ${providers.length} provedores no banco…`,
+    found: providers.length,
+  });
+
   for (const prov of providers) {
     const provSlug = slugify(prov.providerName);
 
@@ -743,13 +765,11 @@ export async function syncSalsaGamesFromSource(options?: {
         name: prov.providerName,
         integration: "SALSA",
         defaultCostPct: costPct,
-        isActive: options?.activateProvider ?? false,
+        isActive: false,
       },
       update: {
         name: prov.providerName,
-        defaultCostPct: costPct,
         integration: "SALSA",
-        ...(options?.activateProvider ? { isActive: true } : {}),
       },
     });
 
@@ -790,7 +810,7 @@ export async function syncSalsaGamesFromSource(options?: {
           thumbnailUrl,
           rtp,
           aggregatorFeePct: Number(provider.defaultCostPct ?? costPct),
-          isActive: provider.isActive,
+          isActive: false,
         },
         update: {
           name,
@@ -799,34 +819,12 @@ export async function syncSalsaGamesFromSource(options?: {
           externalUrl: g.openurl?.trim() || null,
           ...(thumbnailUrl ? { thumbnailUrl } : {}),
           rtp: rtp ?? undefined,
-          aggregatorFeePct: Number(provider.defaultCostPct ?? costPct),
-          ...(options?.activateProvider ? { isActive: true } : {}),
         },
       });
 
       if (existing) updated += 1;
       else created += 1;
     }
-  }
-
-  const categoryIds = [
-    ...new Set(
-      (
-        await prisma.game.findMany({
-          where: { engine: "EXTERNAL" },
-          select: { categoryId: true },
-          distinct: ["categoryId"],
-        })
-      ).map((g) => g.categoryId),
-    ),
-  ];
-
-  const { entitleActiveClientsToCategories } = await import("../../entitlements/entitlement.service.js");
-  const entitlements = await entitleActiveClientsToCategories(categoryIds);
-
-  let published = { providersActivated: 0, gamesActivated: 0, entitlements };
-  if (options?.activateProvider) {
-    published = await publishExternalCatalogToClients();
   }
 
   return {
@@ -841,49 +839,67 @@ export async function syncSalsaGamesFromSource(options?: {
     logosFromBase64,
     fromCache: Boolean(catalog.fromCache),
     rateLimited: catalog.rateLimited ?? null,
-    entitlements,
-    published,
+    published: { providersActivated: 0, gamesActivated: 0 },
   };
 }
 
-/** Ativa o catálogo externo e libera as categorias para os operadores B2B. */
-export async function publishExternalCatalogToClients() {
-  await ensureOssProductionGames();
-  await prisma.gameProvider.updateMany({
-    where: {
-      OR: [{ integration: "SALSA" }, { games: { some: { engine: "EXTERNAL" } } }],
-    },
-    data: { isActive: true, integration: "SALSA" },
+/** Soft-reset: desliga provedores/jogos Salsa e trava o acesso dos sócios. Não apaga dados. */
+export async function deactivateSalsaCatalog() {
+  const salsaProviders = await prisma.gameProvider.findMany({
+    where: { integration: "SALSA" },
+    select: { id: true },
+  });
+  const providerIds = salsaProviders.map((p) => p.id);
+
+  const providers = await prisma.gameProvider.updateMany({
+    where: { integration: "SALSA" },
+    data: { isActive: false },
   });
 
-  await prisma.game.updateMany({
-    where: { engine: "EXTERNAL", externalGameId: { not: null } },
-    data: { isActive: true },
-  });
+  const games = providerIds.length
+    ? await prisma.game.updateMany({
+        where: {
+          providerId: { in: providerIds },
+          NOT: {
+            OR: [{ slug: "gpi-validation" }, { externalGameId: "gpi-validation" }],
+          },
+        },
+        data: { isActive: false },
+      })
+    : { count: 0 };
 
-  const providers = await prisma.gameProvider.findMany({
-    where: { integration: "SALSA", isActive: true },
+  await ensureGpiValidationGame();
+
+  const clients = await prisma.client.findMany({
+    where: { isActive: true },
     select: { id: true },
   });
 
-  const categories = await prisma.game.findMany({
-    where: { engine: "EXTERNAL", isActive: true },
-    select: { categoryId: true },
-    distinct: ["categoryId"],
-  });
-
-  const { entitleActiveClientsToCategories } = await import("../../entitlements/entitlement.service.js");
-  const entitlements = await entitleActiveClientsToCategories(categories.map((c) => c.categoryId));
-
-  const gamesActivated = await prisma.game.count({
-    where: { engine: "EXTERNAL", isActive: true },
-  });
+  let accessRows = 0;
+  for (const client of clients) {
+    for (const providerId of providerIds) {
+      await prisma.clientProviderAccess.upsert({
+        where: { clientId_providerId: { clientId: client.id, providerId } },
+        create: { clientId: client.id, providerId, isEnabled: false },
+        update: { isEnabled: false },
+      });
+      accessRows += 1;
+    }
+  }
 
   return {
-    providersActivated: providers.length,
-    gamesActivated,
-    entitlements,
+    providersDeactivated: providers.count,
+    gamesDeactivated: games.count,
+    partnersLocked: clients.length,
+    accessRows,
   };
+}
+
+/** Emergência: liga o catálogo Salsa inteiro. Prefira ativar um provedor e liberar em Sócios. */
+export async function publishExternalCatalogToClients() {
+  throw new Error(
+    "Publicar tudo foi desativado. Ative um provedor em Integrações e libere no Sócios.",
+  );
 }
 
 export async function setProviderGamesActive(providerId: number, isActive: boolean) {
@@ -991,4 +1007,71 @@ export async function bulkSetProviderCost(input: {
   });
 
   return { gamesUpdated: result.count, providerCostPct: input.providerCostPct };
+}
+
+type SalsaSyncJob = {
+  running: boolean;
+  phase: string;
+  scanned: number;
+  found: number;
+  error: string | null;
+  result: Record<string, unknown> | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+};
+
+const salsaSyncJob: SalsaSyncJob = {
+  running: false,
+  phase: "idle",
+  scanned: 0,
+  found: 0,
+  error: null,
+  result: null,
+  startedAt: null,
+  finishedAt: null,
+};
+
+export function getSalsaCatalogSyncStatus(): SalsaSyncJob {
+  return { ...salsaSyncJob };
+}
+
+export function startSalsaCatalogSync(options?: {
+  gameListUrl?: string;
+  activateProvider?: boolean;
+  defaultCostPct?: number;
+}): SalsaSyncJob {
+  if (salsaSyncJob.running) return getSalsaCatalogSyncStatus();
+
+  salsaSyncJob.running = true;
+  salsaSyncJob.phase = "a iniciar importação…";
+  salsaSyncJob.scanned = 0;
+  salsaSyncJob.found = 0;
+  salsaSyncJob.error = null;
+  salsaSyncJob.result = null;
+  salsaSyncJob.startedAt = Date.now();
+  salsaSyncJob.finishedAt = null;
+
+  void syncSalsaGamesFromSource({
+    gameListUrl: options?.gameListUrl,
+    defaultCostPct: options?.defaultCostPct,
+    onProgress: (info) => {
+      salsaSyncJob.phase = info.phase;
+      if (info.scanned != null) salsaSyncJob.scanned = info.scanned;
+      if (info.found != null) salsaSyncJob.found = info.found;
+    },
+  })
+    .then((result) => {
+      salsaSyncJob.result = result as unknown as Record<string, unknown>;
+      salsaSyncJob.phase = "concluído";
+      salsaSyncJob.running = false;
+      salsaSyncJob.finishedAt = Date.now();
+    })
+    .catch((err: unknown) => {
+      salsaSyncJob.error = err instanceof Error ? err.message : "Sync failed";
+      salsaSyncJob.phase = "erro";
+      salsaSyncJob.running = false;
+      salsaSyncJob.finishedAt = Date.now();
+    });
+
+  return getSalsaCatalogSyncStatus();
 }

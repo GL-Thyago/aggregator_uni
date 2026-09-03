@@ -79,13 +79,14 @@ model Client {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  entitlements  ClientEntitlement[]
-  refreshTokens RefreshToken[]
-  gameSessions  GameSession[]
-  playerWallets PlayerWallet[]
-  clientWallet  ClientWallet?
-  walletTxs     ClientWalletTransaction[]
-  rtpLedgers    ClientGameRtpLedger[]
+  entitlements    ClientEntitlement[]
+  providerAccess  ClientProviderAccess[]
+  refreshTokens   RefreshToken[]
+  gameSessions    GameSession[]
+  playerWallets   PlayerWallet[]
+  clientWallet    ClientWallet?
+  walletTxs       ClientWalletTransaction[]
+  rtpLedgers      ClientGameRtpLedger[]
 
   @@map("clients")
 }
@@ -144,6 +145,28 @@ model ClientEntitlement {
   @@map("client_entitlements")
 }
 
+/// Acesso e comissão por sócio (cliente B2B) × provedor Salsa
+model ClientProviderAccess {
+  id         String   @id @default(cuid())
+  clientId   String   @map("client_id")
+  providerId Int      @map("provider_id")
+  isEnabled  Boolean  @default(false) @map("is_enabled")
+  /// Override do repasse à Salsa para este sócio+provedor
+  feePct     Decimal? @map("fee_pct") @db.Decimal(5, 2)
+  /// Total % cobrado deste sócio neste provedor
+  chargePct  Decimal? @map("charge_pct") @db.Decimal(5, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  client   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  provider GameProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, providerId])
+  @@index([clientId])
+  @@index([providerId])
+  @@map("client_provider_access")
+}
+
 model RefreshToken {
   id        String   @id @default(cuid())
   clientId  String   @map("client_id")
@@ -171,7 +194,8 @@ model GameProvider {
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
 
-  games Game[]
+  games          Game[]
+  clientAccess   ClientProviderAccess[]
 
   @@map("game_providers")
 }

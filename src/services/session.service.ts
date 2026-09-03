@@ -36,6 +36,10 @@ export async function createGameSession(input: {
   if (!game || !game.isActive) throw new Error("Game not found or inactive");
   if (!game.provider.isActive) throw new Error("Game provider is disabled");
   if (!client) throw new Error("Client not found");
+  const { canClientAccessGame } = await import("../entitlements/entitlement.service.js");
+  if (!(await canClientAccessGame(input.clientId, game))) {
+    throw new Error("Game not entitled for this client");
+  }
 
   const isExternal = isExternalLaunchGame(game) || game.provider.integration === "SALSA";
   if (isExternal && !game.externalGameId) {
@@ -56,6 +60,7 @@ export async function createGameSession(input: {
     clientId: input.clientId,
     gameId: game.id,
     categoryId: game.categoryId,
+    providerId: game.providerId,
     defaultProviderCostPct: Number(game.aggregatorFeePct),
     defaultClientMarginPct: Number(client.marginPct),
   });
@@ -127,7 +132,7 @@ export async function getSessionBalance(sessionToken: string) {
   const session = await prisma.gameSession.findUnique({
     where: { sessionToken },
     include: {
-      game: { select: { slug: true, name: true, aggregatorFeePct: true, categoryId: true } },
+      game: { select: { slug: true, name: true, aggregatorFeePct: true, categoryId: true, providerId: true } },
       client: { select: { marginPct: true } },
     },
   });
@@ -142,6 +147,7 @@ export async function getSessionBalance(sessionToken: string) {
     clientId: session.clientId,
     gameId: session.gameId,
     categoryId: session.game.categoryId,
+    providerId: session.game.providerId,
     defaultProviderCostPct: Number(session.game.aggregatorFeePct),
     defaultClientMarginPct: Number(session.client.marginPct),
   });
@@ -191,6 +197,7 @@ export async function processSpin(input: {
     clientId: session.clientId,
     gameId: session.game.id,
     categoryId: session.game.categoryId,
+    providerId: session.game.providerId,
     defaultProviderCostPct: Number(session.game.aggregatorFeePct),
     defaultClientMarginPct: Number(session.client.marginPct),
   });

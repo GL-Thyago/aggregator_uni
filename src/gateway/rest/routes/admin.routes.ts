@@ -354,11 +354,21 @@ router.get("/providers", async (_req, res) => {
     include: { _count: { select: { games: true } } },
     orderBy: { name: "asc" },
   });
+  const ids = providers.map((p) => p.id);
+  const actives = ids.length
+    ? await prisma.game.groupBy({
+        by: ["providerId"],
+        where: { providerId: { in: ids }, isActive: true },
+        _count: { _all: true },
+      })
+    : [];
+  const activeById = new Map(actives.map((row) => [row.providerId, row._count._all]));
   res.json(
     serializeBigInt(
       providers.map((p) => ({
         ...p,
         gameCount: p._count.games,
+        activeGameCount: activeById.get(p.id) ?? 0,
       })),
     ),
   );
@@ -454,17 +464,22 @@ router.get("/integrations/salsa/last-request", async (_req, res) => {
 });
 
 router.post("/integrations/salsa/sync", async (req, res) => {
-  const { syncSalsaGamesFromSource } = await import("../../../services/salsa/salsa-sync.service.js");
+  const { startSalsaCatalogSync } = await import("../../../services/salsa/salsa-sync.service.js");
   try {
-    const result = await syncSalsaGamesFromSource({
+    const status = startSalsaCatalogSync({
       gameListUrl: req.body?.gameListUrl,
       activateProvider: req.body?.activateProvider,
       defaultCostPct: req.body?.defaultCostPct,
     });
-    res.json(result);
+    res.json(status);
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Sync failed" });
   }
+});
+
+router.get("/integrations/salsa/sync", async (_req, res) => {
+  const { getSalsaCatalogSyncStatus } = await import("../../../services/salsa/salsa-sync.service.js");
+  res.json(getSalsaCatalogSyncStatus());
 });
 
 router.post("/integrations/salsa/publish", async (_req, res) => {
@@ -473,6 +488,52 @@ router.post("/integrations/salsa/publish", async (_req, res) => {
     res.json(await publishExternalCatalogToClients());
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Publish failed" });
+  }
+});
+
+router.post("/integrations/salsa/deactivate", async (_req, res) => {
+  const { deactivateSalsaCatalog } = await import("../../../services/salsa/salsa-sync.service.js");
+  try {
+    res.json(await deactivateSalsaCatalog());
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Deactivate failed" });
+  }
+});
+
+router.get("/clients/:id/partner-access", async (req, res) => {
+  const { getPartnerProviderAccess } = await import("../../../services/partner-access.service.js");
+  const data = await getPartnerProviderAccess(req.params.id!);
+  if (!data) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+  res.json(data);
+});
+
+router.put("/clients/:id/partner-access", async (req, res) => {
+  const parsed = z
+    .object({
+      providers: z
+        .array(
+          z.object({
+            providerId: z.number().int(),
+            isEnabled: z.boolean(),
+            feePct: z.number().min(0).max(50).nullable().optional(),
+            chargePct: z.number().min(0).max(50).nullable().optional(),
+          }),
+        )
+        .min(1),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const { savePartnerProviderAccess } = await import("../../../services/partner-access.service.js");
+    res.json(await savePartnerProviderAccess(req.params.id!, parsed.data.providers));
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Save failed" });
   }
 });
 
@@ -499,11 +560,9 @@ router.post("/integrations/salsa/register-games", async (req, res) => {
     return;
   }
 
-  const {
-    normalizeSalsaLaunchGame,
-    upsertSalsaLaunchGames,
-    publishExternalCatalogToClients,
-  } = await import("../../../services/salsa/salsa-sync.service.js");
+  const { normalizeSalsaLaunchGame, upsertSalsaLaunchGames } = await import(
+    "../../../services/salsa/salsa-sync.service.js"
+  );
 
   const items = parsed.data.games
     .map((g) => normalizeSalsaLaunchGame(g))
@@ -515,9 +574,8 @@ router.post("/integrations/salsa/register-games", async (req, res) => {
   }
 
   try {
-    const registered = await upsertSalsaLaunchGames(items);
-    const published = parsed.data.publish ? await publishExternalCatalogToClients() : null;
-    res.json({ ...registered, published });
+    const registered = await upsertSalsaLaunchGames(items, { activate: Boolean(parsed.data.publish) });
+    res.json({ ...registered, published: parsed.data.publish ? { gamesActivated: registered.count } : null });
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Cadastro falhou" });
   }

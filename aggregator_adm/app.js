@@ -94,10 +94,11 @@ function setView(name) {
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
-  const titles = { dashboard: "Dashboard", clients: "Clientes", revenue: "Receita / Repasse", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
+  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", revenue: "Receita / Repasse", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
   $("#view-title").textContent = titles[name] || name;
   if (name === "dashboard") loadDashboard();
   if (name === "clients") loadClientsView();
+  if (name === "partners") loadPartnersView();
   if (name === "revenue") loadRevenueView();
   if (name === "integrations") loadIntegrationsView();
   if (name === "highlights") loadHighlightsView();
@@ -351,6 +352,80 @@ async function refreshClientDetail() {
   };
 }
 
+async function loadPartnersView() {
+  showError("");
+  const select = $("#partner-client-select");
+  const saveBtn = $("#btn-save-partner-access");
+  try {
+    await loadMeta();
+    const current = select.value || state.selectedClientId || state.detailClientId || "";
+    select.innerHTML = '<option value="">Escolha o cliente</option>' +
+      state.clients.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+    select.value = current;
+    if (!select.value) {
+      $("#partner-summary").innerHTML = "";
+      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores e comissões.</p>";
+      saveBtn.disabled = true;
+      return;
+    }
+    await renderPartnerAccess(select.value);
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function renderPartnerAccess(clientId) {
+  const data = await api("/clients/" + clientId + "/partner-access");
+  const enabled = data.providers.filter((p) => p.isEnabled).length;
+  const live = data.providers.filter((p) => p.isEnabled && p.isActiveGlobal).length;
+  $("#partner-summary").innerHTML = [
+    { label: "Sócio", value: data.client.name },
+    { label: "Margem padrão", value: data.client.marginPct + "%" },
+    { label: "Provedores liberados", value: enabled, cls: enabled ? "ok" : "warn" },
+    { label: "Já no ar (global + sócio)", value: live, cls: live ? "ok" : "warn" },
+  ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
+
+  $("#partner-providers-table").innerHTML = `<table>
+    <thead><tr>
+      <th>Liberar</th><th>Provedor</th><th>Catálogo</th><th>Jogos</th><th>Repasse Salsa %</th><th>Cobrança sócio %</th><th>Sua margem</th>
+    </tr></thead>
+    <tbody>${data.providers.map((p) => `
+      <tr data-provider-id="${p.providerId}">
+        <td><input type="checkbox" class="partner-enabled" ${p.isEnabled ? "checked" : ""}></td>
+        <td><strong>${p.name}</strong><br><small>${p.slug}</small></td>
+        <td class="${p.isActiveGlobal ? "ok" : "bad"}">${p.isActiveGlobal ? "Ativo" : "Desligado"}</td>
+        <td class="num">${p.activeGameCount}/${p.gameCount}</td>
+        <td><input class="rate-input partner-fee" type="number" step="0.1" value="${p.feePct ?? ""}" placeholder="${p.defaultCostPct}"></td>
+        <td><input class="rate-input partner-charge" type="number" step="0.1" value="${p.chargePct ?? ""}" placeholder="${p.resolvedChargePct}"></td>
+        <td class="num partner-margin">${p.yourMarginPct}%</td>
+      </tr>`).join("")}
+    </tbody></table>`;
+
+  const updateMargin = (tr) => {
+    const fee = Number(tr.querySelector(".partner-fee").value || tr.querySelector(".partner-fee").placeholder);
+    const chargeVal = tr.querySelector(".partner-charge").value;
+    const charge = chargeVal !== "" ? Number(chargeVal) : Number(tr.querySelector(".partner-charge").placeholder);
+    tr.querySelector(".partner-margin").textContent = Math.max(0, charge - fee).toFixed(1) + "%";
+  };
+  $$("#partner-providers-table .partner-fee, #partner-providers-table .partner-charge").forEach((input) => {
+    input.addEventListener("input", () => updateMargin(input.closest("tr")));
+  });
+  $("#btn-save-partner-access").disabled = false;
+}
+
+function readPartnerAccessFromTable() {
+  return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => {
+    const fee = tr.querySelector(".partner-fee").value;
+    const charge = tr.querySelector(".partner-charge").value;
+    return {
+      providerId: Number(tr.dataset.providerId),
+      isEnabled: tr.querySelector(".partner-enabled").checked,
+      feePct: fee !== "" ? Number(fee) : null,
+      chargePct: charge !== "" ? Number(charge) : null,
+    };
+  });
+}
+
 async function loadRevenueView() {
   showError("");
   try {
@@ -410,7 +485,10 @@ function renderSalsaGamesTable(games) {
         <td>${g.provider?.name || "—"}</td>
         <td><input class="rate-input salsa-game-cost" data-id="${g.id}" type="number" step="0.1" value="${g.providerCostPct}"></td>
         <td class="${g.isActive ? "ok" : "bad"}">${g.isActive ? "Ativo" : "Off"}</td>
-        <td><button class="ghost btn-save-salsa-game-cost" data-id="${g.id}">Salvar</button></td>
+        <td>
+          <button class="ghost btn-save-salsa-game-cost" data-id="${g.id}">Salvar %</button>
+          <button class="ghost btn-toggle-salsa-game" data-id="${g.id}" data-active="${g.isActive}">${g.isActive ? "Desligar" : "Ligar"}</button>
+        </td>
       </tr>`).join("")}
     </tbody></table>`;
 
@@ -420,6 +498,13 @@ function renderSalsaGamesTable(games) {
     const providerCostPct = Number(input.value);
     if (!Number.isFinite(providerCostPct)) return alert("Informe o repasse %");
     await api(`/games/${id}/fees`, { method: "PATCH", body: JSON.stringify({ providerCostPct }) });
+    loadIntegrationsView();
+  }));
+
+  $$(".btn-toggle-salsa-game").forEach((btn) => btn.addEventListener("click", async () => {
+    const id = btn.dataset.id;
+    const next = btn.dataset.active !== "true";
+    await api(`/games/${id}`, { method: "PATCH", body: JSON.stringify({ isActive: next }) });
     loadIntegrationsView();
   }));
 }
@@ -440,6 +525,7 @@ async function loadIntegrationsView() {
       { label: "PN teste", value: salsa.test?.pn || salsa.pn || "—" },
       { label: "PN produção", value: salsa.live?.pn || "ainda vazio no env", cls: liveReady ? "ok" : "warn" },
       { label: "Jogos importados", value: salsa.gamesImported },
+      { label: "Jogos ativos", value: salsa.gamesActive ?? "—", cls: salsa.gamesActive ? "ok" : "warn" },
       { label: "Provedor ativo", value: salsa.providerActive ? "Sim" : "Não" },
       { label: "Repasse padrão", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
     ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
@@ -471,13 +557,14 @@ API live: https://api.salsagator.com
 
     $("#providers-table").innerHTML = `<table>
       <thead><tr>
-        <th>Provedor</th><th>Integração</th><th>Jogos</th><th>Repasse %</th><th>Status</th><th>Ações</th>
+        <th>Provedor</th><th>Integração</th><th>Jogos</th><th>Ativos</th><th>Repasse %</th><th>Status</th><th>Ações</th>
       </tr></thead>
       <tbody>${providers.map((p) => `
         <tr>
           <td><strong>${p.name}</strong><br><small>${p.slug}</small></td>
           <td>${p.integration || "NATIVE"}</td>
           <td class="num">${p.gameCount ?? "—"}</td>
+          <td class="num">${p.activeGameCount ?? "—"}</td>
           <td><input class="rate-input provider-cost" data-id="${p.id}" type="number" step="0.1" value="${p.defaultCostPct ?? ""}" placeholder="—"></td>
           <td class="${p.isActive ? "ok" : "bad"}">${p.isActive ? "Ativo" : "Desativado"}</td>
           <td>
@@ -490,7 +577,9 @@ API live: https://api.salsagator.com
     $$(".btn-toggle-provider").forEach((btn) => btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       const newActive = btn.dataset.active !== "true";
-      const cascade = confirm(newActive ? "Ativar provedor e todos os jogos?" : "Desativar provedor e todos os jogos? (recomendado para PG/Salsa)");
+      const cascade = confirm(newActive
+        ? "Ativar este provedor e todos os jogos dele no catálogo global? Os sócios ainda precisam da liberação na aba Sócios."
+        : "Desativar este provedor e todos os jogos dele?");
       await api(`/providers/${id}?cascadeGames=${cascade ? "1" : "0"}`, {
         method: "PATCH",
         body: JSON.stringify({ isActive: newActive }),
@@ -623,33 +712,93 @@ function initUi() {
 
   $("#btn-highlights-refresh")?.addEventListener("click", loadHighlightsView);
 
-  $("#btn-salsa-sync").addEventListener("click", async () => {
-    showError("");
+  $("#partner-client-select")?.addEventListener("change", async (e) => {
+    const id = e.target.value;
+    if (!id) {
+      $("#partner-summary").innerHTML = "";
+      $("#partner-providers-table").innerHTML = "<p class='hint'>Escolha o sócio (cliente B2B) para liberar provedores e comissões.</p>";
+      $("#btn-save-partner-access").disabled = true;
+      return;
+    }
     try {
-      const defaultCostPct = $("#salsa-default-cost").value !== "" ? Number($("#salsa-default-cost").value) : undefined;
-      const result = await api("/integrations/salsa/sync", {
-        method: "POST",
-        body: JSON.stringify({
-          activateProvider: $("#salsa-activate-on-sync").checked,
-          defaultCostPct,
-        }),
-      });
-      alert(
-        `Sync OK: ${result.created} novos, ${result.updated} atualizados` +
-          `\nCapas URL: ${result.logosFromUrl ?? 0} · BASE64: ${result.logosFromBase64 ?? 0}` +
-          (result.fromCache ? "\n(usou cache — se capas = 0, espera 24h ou força um sync novo)" : ""),
-      );
-      loadIntegrationsView();
-    } catch (e) {
-      showError(e.message);
+      await renderPartnerAccess(id);
+    } catch (err) {
+      showError(err.message);
     }
   });
 
-  $("#btn-salsa-publish")?.addEventListener("click", async () => {
+  $("#btn-save-partner-access")?.addEventListener("click", async () => {
+    const clientId = $("#partner-client-select")?.value;
+    if (!clientId) return;
     showError("");
     try {
-      const result = await api("/integrations/salsa/publish", { method: "POST", body: "{}" });
-      alert(`Catálogo publicado: ${result.gamesActivated} jogos ativos para ${result.entitlements?.clients ?? 0} operador(es)`);
+      await api("/clients/" + clientId + "/partner-access", {
+        method: "PUT",
+        body: JSON.stringify({ providers: readPartnerAccessFromTable() }),
+      });
+      await renderPartnerAccess(clientId);
+      alert("Acesso e comissões do sócio salvos.");
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  $("#btn-salsa-sync").addEventListener("click", async () => {
+    showError("");
+    const overlay = $("#salsa-sync-overlay");
+    const msg = $("#salsa-sync-msg");
+    const detail = $("#salsa-sync-detail");
+    const btn = $("#btn-salsa-sync");
+    overlay?.classList.remove("hidden");
+    btn.disabled = true;
+    if (msg) msg.textContent = "A iniciar importação…";
+    if (detail) detail.textContent = "Isto pode levar alguns minutos. Não feche a página.";
+
+    try {
+      const defaultCostPct = $("#salsa-default-cost").value !== "" ? Number($("#salsa-default-cost").value) : undefined;
+      await api("/integrations/salsa/sync", {
+        method: "POST",
+        body: JSON.stringify({ defaultCostPct }),
+      });
+
+      const started = Date.now();
+      while (Date.now() - started < 15 * 60 * 1000) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const status = await api("/integrations/salsa/sync");
+        if (msg) msg.textContent = status.phase || "A importar…";
+        if (detail) {
+          detail.textContent = status.found
+            ? `Provedores com jogos: ${status.found} · varrido até ${status.scanned || "—"}`
+            : "A pedir o catálogo à Salsa (TaDa = provider 331 primeiro)…";
+        }
+        if (status.running) continue;
+        if (status.error) throw new Error(status.error);
+        const result = status.result || {};
+        alert(
+          `Sync OK: ${result.created ?? 0} novos, ${result.updated ?? 0} atualizados` +
+            `\nCapas URL: ${result.logosFromUrl ?? 0} · BASE64: ${result.logosFromBase64 ?? 0}` +
+            (result.fromCache ? "\n(usou cache — se a TaDa faltar, espera 24h e importa de novo)" : ""),
+        );
+        break;
+      }
+      loadIntegrationsView();
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      overlay?.classList.add("hidden");
+      btn.disabled = false;
+    }
+  });
+
+  $("#btn-salsa-deactivate")?.addEventListener("click", async () => {
+    showError("");
+    if (!confirm("Desligar todos os provedores e jogos Salsa e travar o acesso dos sócios? Clientes, saldos e histórico ficam intactos.")) return;
+    try {
+      const result = await api("/integrations/salsa/deactivate", { method: "POST", body: "{}" });
+      alert(
+        `Catálogo desligado: ${result.gamesDeactivated ?? 0} jogos, ${result.providersDeactivated ?? 0} provedores.\n` +
+          `Sócios travados: ${result.partnersLocked ?? 0}. Agora ative um provedor e liberte na aba Sócios.`,
+      );
       loadIntegrationsView();
     } catch (e) {
       showError(e.message);
@@ -678,8 +827,8 @@ function initUi() {
           `\nNovos: ${created}` +
           `\nJá existiam: ${updated}` +
           (result.published
-            ? `\nPublicado: ${result.published.gamesActivated} jogos ativos`
-            : "\nNão publicado — clica em Publicar no cassino se precisares."),
+            ? `\nAtivados só estes IDs: ${result.published.gamesActivated}`
+            : "\nSó cadastrados — ative o provedor em Integrações e liberte no Sócios."),
       );
       $("#salsa-register-pack").value = "";
       loadIntegrationsView();

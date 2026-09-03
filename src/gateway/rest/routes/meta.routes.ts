@@ -43,7 +43,10 @@ export const API_ROUTES: RouteInfo[] = [
   { method: "GET", path: "/admin/v1/fees/report", auth: "admin", description: "Relatório de taxas cobradas (GGR, gameFee, clientFee)" },
   { method: "GET", path: "/admin/v1/clients/:id/rtp", auth: "admin", description: "RTP por cliente (?gameId= opcional)" },
   { method: "GET", path: "/admin/v1/integrations/salsa/last-request", auth: "admin", description: "Último XML da Salsa (GPI: ver a requisição que falhou)" },
-  { method: "POST", path: "/admin/v1/integrations/salsa/publish", auth: "admin", description: "Ativar catálogo externo e liberar para operadores" },
+  { method: "POST", path: "/admin/v1/integrations/salsa/publish", auth: "admin", description: "Desativado — use Sócios + um provedor de cada vez" },
+  { method: "POST", path: "/admin/v1/integrations/salsa/deactivate", auth: "admin", description: "Desativar catálogo Salsa e travar acesso dos sócios" },
+  { method: "GET", path: "/admin/v1/clients/:id/partner-access", auth: "admin", description: "Acesso e comissão do sócio por provedor" },
+  { method: "PUT", path: "/admin/v1/clients/:id/partner-access", auth: "admin", description: "Salvar acesso e comissão do sócio" },
 ];
 
 const router = Router();

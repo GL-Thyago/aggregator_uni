@@ -27,6 +27,7 @@
       <nav>
         <button data-view="dashboard" class="nav active">Dashboard</button>
         <button data-view="clients" class="nav">Clientes</button>
+        <button data-view="partners" class="nav">Sócios</button>
         <button data-view="revenue" class="nav">Receita / Repasse</button>
         <button data-view="integrations" class="nav">Integrações</button>
         <button data-view="highlights" class="nav">Top 10 / Destaques</button>
@@ -51,6 +52,13 @@
       </header>
 
       <div id="global-error" class="banner err hidden"></div>
+      <div id="salsa-sync-overlay" class="sync-overlay hidden">
+        <div class="sync-card">
+          <div class="sync-spinner"></div>
+          <p id="salsa-sync-msg">A importar catálogo Salsa…</p>
+          <p class="hint" id="salsa-sync-detail">Não feche esta página. O Cloudflare corta pedidos longos; o import corre em fundo.</p>
+        </div>
+      </div>
 
       <!-- Dashboard -->
       <section id="view-dashboard" class="view">
@@ -140,6 +148,23 @@
         </div>
       </section>
 
+      <section id="view-partners" class="view hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Acesso de sócio</h3>
+            <select id="partner-client-select">
+              <option value="">Escolha o cliente</option>
+            </select>
+          </div>
+          <p class="hint">Liberar provedor e definir comissão <strong>só para este cassino</strong>. O provedor também precisa estar ativo em Integrações — senão o lobby continua vazio.</p>
+          <div class="cards" id="partner-summary"></div>
+          <div class="table-wrap" id="partner-providers-table"></div>
+          <div class="inline-form">
+            <button type="button" id="btn-save-partner-access" disabled>Salvar acesso e comissões</button>
+          </div>
+        </div>
+      </section>
+
       <!-- Receita -->
       <section id="view-revenue" class="view hidden">
         <div class="panel">
@@ -167,10 +192,10 @@
           <div id="salsa-status" class="cards"></div>
           <div class="inline-form">
             <button id="btn-salsa-sync">Importar jogos do JSON Salsa</button>
-            <button id="btn-salsa-publish" class="ghost">Publicar no cassino</button>
-            <label class="inline-check"><input type="checkbox" id="salsa-activate-on-sync"> Ativar e publicar após sync</label>
-            <input id="salsa-default-cost" type="number" step="0.1" placeholder="Repasse padrão %" style="width:120px">
+            <button id="btn-salsa-deactivate" class="ghost danger">Desativar todo o catálogo Salsa</button>
+            <input id="salsa-default-cost" type="number" step="0.1" placeholder="Repasse padrão % (só jogos novos)" style="width:220px">
           </div>
+          <p class="hint">O import só atualiza nomes, IDs e capas. <strong>Não liga jogos</strong>. Depois: Integrações → ativar um provedor → Sócios → liberar e pôr a comissão.</p>
           <form id="salsa-config-form" class="form-grid" style="margin-top:1rem">
             <label><input type="checkbox" name="enabled"> Salsa ativa</label>
             <label>PN teste (staging)<input name="publisherName" placeholder="rg-games-staging"></label>
@@ -187,7 +212,7 @@
           <p class="hint">Quando a Salsa pedir jogos em Produção, cola os códigos aqui. Não precisa de novo deploy. Ex.: <code>znt-aviator</code>, <code>tada-Crazy777</code>. Marca publicar para os cassinos verem na hora.</p>
           <textarea id="salsa-register-pack" rows="8" placeholder="Cole o e-mail ou os IDs, um por linha:&#10;znt-slot-geishas-revenge&#10;znt-aviator&#10;tada-BombingFishing Bombing Fishing"></textarea>
           <div class="inline-form" style="margin-top:0.75rem">
-            <label class="inline-check"><input type="checkbox" id="salsa-register-publish" checked> Publicar no cassino depois</label>
+            <label class="inline-check"><input type="checkbox" id="salsa-register-publish"> Ativar só estes IDs</label>
             <button type="button" id="btn-salsa-register">Cadastrar IDs</button>
           </div>
         </div>
@@ -204,7 +229,7 @@
         </div>
         <div class="panel">
           <h3>Provedores — ligue/desligue PG, Salsa, etc.</h3>
-          <p class="hint">Desativar um provedor oculta todos os jogos dele para os operadores. Use cascade para desativar os jogos também.</p>
+          <p class="hint">Ative <strong>um provedor de cada vez</strong>. Isso só liga no catálogo global — o sócio ainda precisa da liberação na aba Sócios.</p>
           <div class="table-wrap" id="providers-table"></div>
         </div>
       </section>
