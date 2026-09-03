@@ -110,7 +110,7 @@ router.get("/games", authMiddleware, async (req: AuthenticatedRequest, res) => {
     games = games.filter((g) => g.isFeatured);
   }
 
-  res.set("Cache-Control", "private, max-age=60, stale-while-revalidate=120");
+  res.set("Cache-Control", "private, max-age=5, stale-while-revalidate=15");
   res.json(serializeBigInt(games.map((g) => toClientGameDto(g))));
 });
 

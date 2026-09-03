@@ -27,6 +27,13 @@ function sinceDate() {
   return d.toISOString();
 }
 
+function setNamedField(form, name, value, { checkbox = false } = {}) {
+  const el = form?.elements?.namedItem?.(name) || form?.querySelector?.(`[name="${name}"]`);
+  if (!el || el instanceof RadioNodeList) return;
+  if (checkbox) el.checked = Boolean(value);
+  else el.value = value ?? "";
+}
+
 function showError(msg) {
   const el = $("#global-error");
   if (!msg) {
@@ -542,15 +549,13 @@ async function loadIntegrationsView() {
 
     if (salsaCfg) {
       const form = $("#salsa-config-form");
-      form.enabled.checked = salsaCfg.enabled;
-      form.publisherName.value = salsaCfg.publisherName || "";
-      form.gameListUrl.value = salsaCfg.gameListUrl || "";
-      form.apiBase.value = salsaCfg.apiBase || "";
+      setNamedField(form, "enabled", salsaCfg.enabled, { checkbox: true });
+      setNamedField(form, "publisherName", salsaCfg.publisherName || "");
+      setNamedField(form, "gameListUrl", salsaCfg.gameListUrl || "");
+      setNamedField(form, "apiBase", salsaCfg.apiBase || "");
       const commissions = $("#commission-defaults-form");
-      if (commissions) {
-        commissions.defaultProviderCostPct.value = salsaCfg.defaultProviderCostPct ?? 6.5;
-        commissions.defaultOperatorChargePct.value = salsaCfg.defaultOperatorChargePct ?? 20;
-      }
+      setNamedField(commissions, "defaultProviderCostPct", salsaCfg.defaultProviderCostPct ?? 6.5);
+      setNamedField(commissions, "defaultOperatorChargePct", salsaCfg.defaultOperatorChargePct ?? 20);
     }
 
     $("#salsa-config-pre").textContent = `# Publisher (único, a Salsa chama isto):
@@ -590,7 +595,7 @@ API live: https://api.salsagator.com
       const id = btn.dataset.id;
       const newActive = btn.dataset.active !== "true";
       const cascade = confirm(newActive
-        ? "Ativar este provedor e todos os jogos dele no catálogo global? Os sócios ainda precisam da liberação na aba Sócios."
+        ? "Ativar este provedor, todos os jogos dele, e liberar nos cassinos (SorteioBR etc.)?"
         : "Desativar este provedor e todos os jogos dele?");
       await api(`/providers/${id}?cascadeGames=${cascade ? "1" : "0"}`, {
         method: "PATCH",

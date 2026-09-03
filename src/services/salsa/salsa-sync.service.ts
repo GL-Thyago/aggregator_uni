@@ -902,12 +902,32 @@ export async function publishExternalCatalogToClients() {
   );
 }
 
+export async function grantProviderToActiveClients(providerId: number) {
+  const { refreshClientEntitlements } = await import("../../entitlements/entitlement.service.js");
+  const clients = await prisma.client.findMany({
+    where: { isActive: true },
+    select: { id: true },
+  });
+
+  for (const client of clients) {
+    await prisma.clientProviderAccess.upsert({
+      where: { clientId_providerId: { clientId: client.id, providerId } },
+      create: { clientId: client.id, providerId, isEnabled: true },
+      update: { isEnabled: true },
+    });
+    await refreshClientEntitlements(client.id);
+  }
+
+  return { clients: clients.length };
+}
+
 export async function setProviderGamesActive(providerId: number, isActive: boolean) {
   const result = await prisma.game.updateMany({
     where: { providerId },
     data: { isActive },
   });
   await prisma.gameProvider.update({ where: { id: providerId }, data: { isActive } });
+  if (isActive) await grantProviderToActiveClients(providerId);
   return result;
 }
 

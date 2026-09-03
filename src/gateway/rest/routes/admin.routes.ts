@@ -337,6 +337,15 @@ router.patch("/games/:id", async (req, res) => {
     include: { category: true, provider: true },
   });
 
+  if (parsed.data.isActive === true) {
+    await prisma.gameProvider.update({
+      where: { id: game.providerId },
+      data: { isActive: true },
+    });
+    const { grantProviderToActiveClients } = await import("../../../services/salsa/salsa-sync.service.js");
+    await grantProviderToActiveClients(game.providerId);
+  }
+
   res.json(serializeBigInt(game));
 });
 
@@ -426,6 +435,10 @@ router.patch("/providers/:id", async (req, res) => {
 
   if (isActive !== undefined && cascadeGames) {
     await prisma.game.updateMany({ where: { providerId: id }, data: { isActive } });
+    if (isActive) {
+      const { grantProviderToActiveClients } = await import("../../../services/salsa/salsa-sync.service.js");
+      await grantProviderToActiveClients(id);
+    }
   }
 
   res.json(serializeBigInt(provider));
