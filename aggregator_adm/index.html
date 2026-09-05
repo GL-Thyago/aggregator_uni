@@ -28,7 +28,7 @@
         <button data-view="dashboard" class="nav active">Dashboard</button>
         <button data-view="clients" class="nav">Clientes</button>
         <button data-view="partners" class="nav">Sócios</button>
-        <button data-view="revenue" class="nav">Receita / Repasse</button>
+        <button data-view="revenue" class="nav">Cobrança / Relatório</button>
         <button data-view="integrations" class="nav">Integrações</button>
         <button data-view="highlights" class="nav">Top 10 / Destaques</button>
         <button data-view="rtp" class="nav">RTP</button>
@@ -156,7 +156,7 @@
               <option value="">Escolha o cliente</option>
             </select>
           </div>
-          <p class="hint">A % da Salsa é a mesma para todos (definida em Integrações). Aqui você libera o provedor e, se precisar, altera só a <strong>cobrança deste cliente</strong>.</p>
+          <p class="hint">A <strong>% Salsa</strong> de cada provedor vem de Integrações (PG 7,3 / Spribe 8, etc.). Aqui você cobra o sócio: um valor para todos, ou um valor diferente por provedor. Vazio na linha = usa a cobrança deste sócio.</p>
           <div class="cards" id="partner-summary"></div>
           <div id="partner-charge-box" class="inline-form hidden">
             <label>Cobrança deste sócio %
@@ -171,30 +171,41 @@
         </div>
       </section>
 
-      <!-- Receita -->
       <section id="view-revenue" class="view hidden">
         <div class="panel">
-          <h3>Quanto você ganha vs quanto repassa (por jogo)</h3>
-          <p class="hint">Ganho = taxa do jogo + margem B2B · Repasse = prêmios pagos aos jogadores</p>
-          <div class="table-wrap" id="revenue-table"></div>
+          <h3>Cobrança por GGR</h3>
+          <p class="hint">Você só ganha do que sobra. Cliente negativo = R$ 0. No consolidado, GGR ≤ 0 = sem ganho e sem repasse à Salsa. Use o filtro de cliente no topo para faturar um operador.</p>
+          <div class="cards" id="billing-summary"></div>
+          <p class="hint" id="billing-rule"></p>
+          <div class="inline-form">
+            <button type="button" id="btn-billing-excel">Excel / CSV</button>
+            <button type="button" id="btn-billing-pdf" class="ghost">PDF / imprimir</button>
+          </div>
         </div>
-        <div class="grid-2">
-          <div class="panel">
-            <h3>Ganho do agregador</h3>
-            <canvas id="chart-revenue-earn"></canvas>
-          </div>
-          <div class="panel">
-            <h3>Repasse (prêmios)</h3>
-            <canvas id="chart-revenue-payout"></canvas>
-          </div>
+        <div class="panel">
+          <h3>Por cliente</h3>
+          <div class="table-wrap" id="billing-clients-table"></div>
+        </div>
+        <div class="panel">
+          <h3>Por provedor (para o cliente conferir a %)</h3>
+          <div class="table-wrap" id="billing-providers-table"></div>
+        </div>
+        <div class="panel">
+          <h3>Jogadas</h3>
+          <div class="table-wrap" id="billing-spins-table"></div>
+          <div class="table-pager" id="billing-spins-pager"></div>
         </div>
       </section>
 
-      <!-- Integrações -->
       <section id="view-integrations" class="view hidden">
         <div class="panel">
-          <h3>Comissões padrão</h3>
-          <p class="hint">Estes dois valores valem para <strong>todos</strong> os jogos e sócios. Na aba Sócios você só altera a cobrança de um cliente específico.</p>
+          <h3>1. % que a Salsa cobra de ti (por provedor)</h3>
+          <p class="hint">É aqui. PG Soft = 7,3 · Spribe = 8 · etc. <strong>Salvar</strong> grava o padrão. <strong>Aplicar %</strong> copia para todos os jogos daquele provedor. A cobrança do teu cliente (15% ou diferente por provedor) fica na aba <strong>Sócios</strong>.</p>
+          <div class="table-wrap" id="providers-cost-table"></div>
+        </div>
+        <div class="panel">
+          <h3>Comissões padrão (quando o provedor não tem %)</h3>
+          <p class="hint">Estes dois valores valem para jogos novos e sócios sem override. Na aba Sócios você cobra o operador.</p>
           <form id="commission-defaults-form" class="inline-form">
             <label>% da Salsa (repasse)
               <input name="defaultProviderCostPct" type="number" step="0.1" min="0" max="50" required>

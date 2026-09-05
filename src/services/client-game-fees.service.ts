@@ -2,11 +2,8 @@ import { prisma } from "../lib/prisma.js";
 import { getSalsaRuntimeConfig } from "./salsa/salsa-config.service.js";
 
 export interface ResolvedClientGameFees {
-  /** Repasse à Salsa — sempre o % padrão global */
   providerCostPct: number;
-  /** Sua margem B2B sobre a aposta */
   clientMarginPct: number;
-  /** Total debitado do operador */
   totalChargePct: number;
   gameFeePct: number;
   clientFeePct: number;
@@ -14,8 +11,8 @@ export interface ResolvedClientGameFees {
 }
 
 /**
- * Salsa % = padrão global (um valor para todos).
- * Cobrança operador = override do cliente, senão o padrão global.
+ * % Salsa: override sócio+provedor → % do provedor → padrão global → % do jogo.
+ * Cobrança: override sócio+provedor → cobrança do sócio → padrão global.
  */
 export async function resolveClientGameFees(input: {
   clientId: string;
@@ -25,21 +22,36 @@ export async function resolveClientGameFees(input: {
   defaultProviderCostPct: number;
   defaultClientMarginPct: number;
 }): Promise<ResolvedClientGameFees> {
-  const [cfg, client] = await Promise.all([
+  const [cfg, client, provider, access] = await Promise.all([
     getSalsaRuntimeConfig(),
     prisma.client.findUnique({
       where: { id: input.clientId },
       select: { chargePct: true, marginPct: true },
     }),
+    input.providerId
+      ? prisma.gameProvider.findUnique({
+          where: { id: input.providerId },
+          select: { defaultCostPct: true },
+        })
+      : Promise.resolve(null),
+    input.providerId
+      ? prisma.clientProviderAccess.findUnique({
+          where: { clientId_providerId: { clientId: input.clientId, providerId: input.providerId } },
+          select: { feePct: true, chargePct: true },
+        })
+      : Promise.resolve(null),
   ]);
 
-  const providerCostPct = Number(cfg.defaultProviderCostPct) || input.defaultProviderCostPct;
-  const globalCharge = Number(cfg.defaultOperatorChargePct) || roundPct(providerCostPct + input.defaultClientMarginPct);
+  const globalSalsa = Number(cfg.defaultProviderCostPct) || input.defaultProviderCostPct;
+  const providerSalsa = provider?.defaultCostPct != null ? Number(provider.defaultCostPct) : null;
+  const accessSalsa = access?.feePct != null ? Number(access.feePct) : null;
+  const providerCostPct = accessSalsa ?? providerSalsa ?? globalSalsa;
 
-  const chargeOverride =
-    client?.chargePct !== null && client?.chargePct !== undefined ? Number(client.chargePct) : null;
-
-  const totalChargePct = chargeOverride ?? globalCharge;
+  const globalCharge =
+    Number(cfg.defaultOperatorChargePct) || roundPct(providerCostPct + input.defaultClientMarginPct);
+  const clientCharge = client?.chargePct != null ? Number(client.chargePct) : null;
+  const accessCharge = access?.chargePct != null ? Number(access.chargePct) : null;
+  const totalChargePct = accessCharge ?? clientCharge ?? globalCharge;
   const clientMarginPct = Math.max(0, roundPct(totalChargePct - providerCostPct));
 
   return {
@@ -48,10 +60,10 @@ export async function resolveClientGameFees(input: {
     totalChargePct,
     gameFeePct: providerCostPct,
     clientFeePct: clientMarginPct,
-    chargePctOverride: chargeOverride,
+    chargePctOverride: accessCharge ?? clientCharge,
   };
 }
 
-function roundPct(n: number): number {
+function roundPct(n: number) {
   return Math.round(n * 100) / 100;
 }

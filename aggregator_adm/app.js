@@ -10,6 +10,8 @@ const state = {
   selectedClientId: "",
   detailClientId: null,
   salsaGamesPage: 1,
+  billingSpinsPage: 1,
+  billingReport: null,
   charts: {},
 };
 
@@ -102,7 +104,7 @@ function setView(name) {
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
-  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", revenue: "Receita / Repasse", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
+  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", revenue: "Cobrança / Relatório", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
   $("#view-title").textContent = titles[name] || name;
   if (name === "dashboard") loadDashboard();
   if (name === "clients") loadClientsView();
@@ -127,11 +129,15 @@ async function loadMeta() {
 }
 
 function renderOverviewCards(data) {
+  const earn = data.yourEarn ?? 0;
+  const ggr = data.ggr ?? 0;
   $("#overview-cards").innerHTML = [
     { label: "Apostado", value: money(data.betAmount) },
-    { label: "Repasse (prêmios)", value: money(data.playerPayout), sub: "Pago aos jogadores" },
-    { label: "Seu ganho", value: money(data.aggregatorRevenue), sub: "Taxa jogo + margem B2B", cls: "ok" },
-    { label: "GGR", value: money(data.ggr), sub: "Apostado − prêmios" },
+    { label: "Prêmios", value: money(data.playerPayout ?? data.winAmount), sub: "Pago aos jogadores" },
+    { label: "GGR", value: money(ggr), sub: "Apostado − prêmios", cls: ggr < 0 ? "bad" : "" },
+    { label: "Seu ganho", value: money(earn), sub: ggr <= 0 && !state.selectedClientId ? "GGR geral ≤ 0 · sem ganho" : "Só do GGR positivo", cls: earn > 0 ? "ok" : "" },
+    { label: "A pagar Salsa", value: money(data.salsaPayable ?? 0), sub: ggr <= 0 ? "GGR ≤ 0 · não repassa" : "Sobre o GGR positivo" },
+    { label: "A cobrar clientes", value: money(data.invoiceable ?? 0), sub: "Só quem fechou positivo" },
     { label: "Spins", value: data.spinCount.toLocaleString("pt-BR") },
     { label: "Clientes ativos", value: data.activeClients },
   ].map((c) => `
@@ -150,7 +156,7 @@ function renderClientMovement(rows) {
   $("#client-movement-table").innerHTML = `<table>
     <thead><tr>
       <th>Cliente</th><th>Cobrança</th><th>Spins</th><th>Apostado</th>
-      <th>Repasse</th><th>Seu ganho</th><th>Saldo B2B</th><th>Última atividade</th>
+      <th>Prêmios</th><th>GGR cobrável</th><th>Saldo B2B</th><th>Última atividade</th>
     </tr></thead>
     <tbody>${rows.map((r) => `
       <tr>
@@ -159,7 +165,7 @@ function renderClientMovement(rows) {
         <td class="num">${r.spins}</td>
         <td class="num">${money(r.betAmount)}</td>
         <td class="num">${money(r.winAmount)}</td>
-        <td class="num ok">${money(r.aggregatorRevenue)}</td>
+        <td class="num ${r.ggr > 0 ? "ok" : ""}">${money(Math.max(0, r.ggr))}</td>
         <td class="num ${r.walletBalance < 0 ? "bad" : ""}">${money(r.walletBalance)}</td>
         <td>${new Date(r.lastActivity).toLocaleString("pt-BR")}</td>
       </tr>`).join("")}
@@ -403,17 +409,19 @@ async function renderPartnerAccess(clientId) {
   chargeInput.placeholder = String(data.defaults.operatorChargePct);
   chargeInput.value = data.client.chargePct ?? "";
   $("#partner-charge-hint").textContent =
-    `Salsa ${data.defaults.salsaPct}% · vazio = cobra ${data.defaults.operatorChargePct}% como os outros · sua margem = cobrança − Salsa`;
+    `Vazio aqui = cobra ${data.defaults.operatorChargePct}% em todos. Na tabela podes pôr 15 no PG e 18 no Spribe. A % Salsa de cada provedor edita-se em Integrações.`;
 
   $("#partner-providers-table").innerHTML = `<table>
     <thead><tr>
-      <th>Liberar</th><th>Provedor</th><th>Catálogo</th><th>Jogos</th>
+      <th>Liberar</th><th>Provedor</th><th>% Salsa</th><th>Cobrança deste sócio</th><th>Tua margem</th><th>Jogos</th>
     </tr></thead>
     <tbody>${data.providers.map((p) => `
       <tr data-provider-id="${p.providerId}">
         <td><input type="checkbox" class="partner-enabled" ${p.isEnabled ? "checked" : ""}></td>
-        <td><strong>${p.name}</strong><br><small>${p.slug}</small></td>
-        <td class="${p.isActiveGlobal ? "ok" : "bad"}">${p.isActiveGlobal ? "Ativo" : "Desligado"}</td>
+        <td><strong>${p.name}</strong><br><small>${p.sourceName && p.sourceName !== p.name ? p.sourceName + " · " : ""}${p.slug}</small></td>
+        <td class="num">${p.salsaPct}%</td>
+        <td><input class="rate-input partner-charge" type="number" step="0.1" min="0" max="50" value="${p.chargePct ?? ""}" placeholder="${data.client.resolvedChargePct}"></td>
+        <td class="num ok">${p.yourMarginPct}%</td>
         <td class="num">${p.activeGameCount}/${p.gameCount}</td>
       </tr>`).join("")}
     </tbody></table>`;
@@ -422,53 +430,168 @@ async function renderPartnerAccess(clientId) {
 }
 
 function readPartnerAccessFromTable() {
-  return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => ({
-    providerId: Number(tr.dataset.providerId),
-    isEnabled: tr.querySelector(".partner-enabled").checked,
-  }));
+  return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => {
+    const raw = tr.querySelector(".partner-charge")?.value;
+    return {
+      providerId: Number(tr.dataset.providerId),
+      isEnabled: tr.querySelector(".partner-enabled").checked,
+      chargePct: raw === "" || raw == null ? null : Number(raw),
+    };
+  });
+}
+
+function renderBillingSummary(report) {
+  const ggr = report.ggr ?? 0;
+  $("#billing-summary").innerHTML = [
+    { label: "Apostado", value: money(report.betAmount) },
+    { label: "Prêmios", value: money(report.winAmount) },
+    { label: "GGR", value: money(ggr), cls: ggr < 0 ? "bad" : "" },
+    { label: "A cobrar", value: money(report.invoiceable), sub: "Clientes positivos" },
+    { label: "A pagar Salsa", value: money(report.salsaPayable) },
+    { label: "Seu ganho", value: money(report.yourEarn), cls: report.yourEarn > 0 ? "ok" : "" },
+  ].map((c) => `
+    <div class="card">
+      <div class="label">${c.label}</div>
+      <div class="value ${c.cls || ""}">${c.value}</div>
+      ${c.sub ? `<div class="sub">${c.sub}</div>` : ""}
+    </div>`).join("");
+  $("#billing-rule").textContent = report.rule || "";
 }
 
 async function loadRevenueView() {
   showError("");
+  state.billingSpinsPage = 1;
   try {
-    const rows = await api("/analytics/revenue-by-game" + qs());
-    $("#revenue-table").innerHTML = rows.length ? `<table>
-      <thead><tr>
-        <th>Jogo</th><th>Spins</th><th>Apostado</th><th>Você ganha</th><th>Repasse</th><th>GGR</th>
-      </tr></thead>
-      <tbody>${rows.map((r) => `
-        <tr>
-          <td>${r.name}</td>
-          <td class="num">${r.spins}</td>
-          <td class="num">${money(r.betAmount)}</td>
-          <td class="num ok">${money(r.aggregatorEarns)}<br><small>jogo ${money(r.gameFeeAmount)} + B2B ${money(r.clientFeeAmount)}</small></td>
-          <td class="num warn">${money(r.playerPayout)}</td>
-          <td class="num">${money(r.ggr)}</td>
-        </tr>`).join("")}
-      </tbody></table>` : "<p class='hint'>Sem dados no período.</p>";
+    const report = await api("/billing/report" + qs());
+    state.billingReport = report;
+    renderBillingSummary(report);
 
-    const top = rows.slice(0, 8);
-    destroyChart("revenueEarn");
-    state.charts.revenueEarn = new Chart($("#chart-revenue-earn"), {
-      type: "doughnut",
-      data: {
-        labels: top.map((r) => r.name),
-        datasets: [{ data: top.map((r) => r.aggregatorEarns), backgroundColor: ["#6366f1","#818cf8","#a5b4fc","#22c55e","#eab308","#f97316","#ef4444","#8b5cf6"] }],
-      },
-      options: { plugins: { legend: { labels: { color: "#eef1f7" } } } },
-    });
-    destroyChart("revenuePayout");
-    state.charts.revenuePayout = new Chart($("#chart-revenue-payout"), {
-      type: "bar",
-      data: {
-        labels: top.map((r) => r.name),
-        datasets: [{ label: "Repasse", data: top.map((r) => r.playerPayout), backgroundColor: "#22c55e" }],
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#8b93a7" } }, y: { ticks: { color: "#8b93a7" } } } },
-    });
+    $("#billing-clients-table").innerHTML = report.clients.length ? `<table>
+      <thead><tr>
+        <th>Cliente</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>A cobrar</th><th>Salsa</th><th>Seu ganho</th>
+      </tr></thead>
+      <tbody>${report.clients.map((c) => `
+        <tr>
+          <td><button class="ghost link-billing-client" data-id="${c.clientId}">${c.clientName}</button></td>
+          <td class="num">${c.spins}</td>
+          <td class="num">${money(c.betAmount)}</td>
+          <td class="num">${money(c.winAmount)}</td>
+          <td class="num ${c.ggr < 0 ? "bad" : "ok"}">${money(c.ggr)}</td>
+          <td class="num">${money(c.chargeAmount)}</td>
+          <td class="num">${money(c.salsaDue)}</td>
+          <td class="num ok">${money(c.yourEarn)}</td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem movimento no período.</p>";
+
+    $$(".link-billing-client").forEach((btn) => btn.addEventListener("click", () => {
+      $("#client-filter").value = btn.dataset.id;
+      state.selectedClientId = btn.dataset.id;
+      loadRevenueView();
+    }));
+
+    $("#billing-providers-table").innerHTML = report.providers.length ? `<table>
+      <thead><tr>
+        <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>
+      </tr></thead>
+      <tbody>${report.providers.map((p) => `
+        <tr>
+          <td>${p.clientName}</td>
+          <td><strong>${p.providerName}</strong></td>
+          <td class="num">${p.spins}</td>
+          <td class="num">${money(p.betAmount)}</td>
+          <td class="num">${money(p.winAmount)}</td>
+          <td class="num ${p.ggr < 0 ? "bad" : "ok"}">${money(p.ggr)}</td>
+          <td class="num">${p.salsaPct}%</td>
+          <td class="num">${p.chargePct}%</td>
+          <td class="num">${money(p.chargeAmount)}</td>
+          <td class="num ok">${money(p.yourEarn)}</td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem dados por provedor.</p>";
+
+    await loadBillingSpins(1);
   } catch (e) {
     showError(e.message);
   }
+}
+
+async function loadBillingSpins(page = 1) {
+  state.billingSpinsPage = page;
+  const data = await api("/billing/spins" + qs({ page, pageSize: 25 }));
+  $("#billing-spins-table").innerHTML = data.spins.length ? `<table>
+    <thead><tr>
+      <th>Data</th><th>Cliente</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th>
+    </tr></thead>
+    <tbody>${data.spins.map((s) => `
+      <tr>
+        <td>${new Date(s.at).toLocaleString("pt-BR")}</td>
+        <td>${s.clientName}</td>
+        <td>${s.provider}</td>
+        <td>${s.game}</td>
+        <td class="num">${money(s.betAmount)}</td>
+        <td class="num">${money(s.winAmount)}</td>
+        <td class="num ${s.ggr < 0 ? "bad" : "ok"}">${money(s.ggr)}</td>
+        <td class="num">${s.salsaPct}%</td>
+        <td class="num">${s.chargePct}%</td>
+      </tr>`).join("")}
+    </tbody></table>` : "<p class='hint'>Sem jogadas neste período.</p>";
+
+  const from = data.total ? (data.page - 1) * data.pageSize + 1 : 0;
+  const to = Math.min(data.page * data.pageSize, data.total);
+  $("#billing-spins-pager").innerHTML = `
+    <span class="pager-info">${from}–${to} de ${data.total}</span>
+    <button type="button" class="ghost" id="billing-prev" ${data.page <= 1 ? "disabled" : ""}>Anterior</button>
+    <span>Pág. ${data.page} / ${data.pages}</span>
+    <button type="button" class="ghost" id="billing-next" ${data.page >= data.pages ? "disabled" : ""}>Próxima</button>
+  `;
+  $("#billing-prev")?.addEventListener("click", () => loadBillingSpins(data.page - 1));
+  $("#billing-next")?.addEventListener("click", () => loadBillingSpins(data.page + 1));
+}
+
+async function downloadBillingExcel() {
+  const res = await fetch(state.apiBase + "/billing/export" + qs(), {
+    headers: { "X-Admin-Key": state.adminKey },
+  });
+  if (!res.ok) throw new Error("Falha ao exportar");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cobranca-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function printBillingPdf() {
+  const report = state.billingReport;
+  if (!report) return;
+  const w = window.open("", "_blank");
+  if (!w) {
+    showError("Permite pop-ups para gerar o PDF.");
+    return;
+  }
+  const rows = (report.providers || []).map((p) => `
+    <tr>
+      <td>${p.clientName}</td><td>${p.providerName}</td><td>${p.spins}</td>
+      <td>${money(p.betAmount)}</td><td>${money(p.winAmount)}</td><td>${money(p.ggr)}</td>
+      <td>${p.salsaPct}%</td><td>${p.chargePct}%</td>
+      <td>${money(p.chargeAmount)}</td><td>${money(p.yourEarn)}</td>
+    </tr>`).join("");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cobrança</title>
+    <style>
+      body { font-family: Segoe UI, sans-serif; color: #111; padding: 24px; }
+      h1 { font-size: 20px; } table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+      th { background: #f3f3f3; } .num { text-align: right; }
+    </style></head><body>
+    <h1>Relatório de cobrança</h1>
+    <p>${report.rule || ""}</p>
+    <p>Apostado ${money(report.betAmount)} · Prêmios ${money(report.winAmount)} · GGR ${money(report.ggr)} · A cobrar ${money(report.invoiceable)} · Salsa ${money(report.salsaPayable)} · Seu ganho ${money(report.yourEarn)}</p>
+    <table><thead><tr>
+      <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <script>window.onload=function(){window.print();}</script>
+    </body></html>`);
+  w.document.close();
 }
 
 function renderSalsaGamesTable(data) {
@@ -591,7 +714,7 @@ API live: https://api.salsagator.com
 
     await loadSalsaGamesPage(state.salsaGamesPage);
 
-    $("#providers-table").innerHTML = `<table>
+    const providersHtml = `<table>
       <thead><tr>
         <th>API / slug</th><th>Nome comercial</th><th>% Salsa</th><th>Jogos</th><th>Status</th><th>Ações</th>
       </tr></thead>
@@ -609,6 +732,9 @@ API live: https://api.salsagator.com
           </td>
         </tr>`).join("")}
       </tbody></table>`;
+    const costBox = $("#providers-cost-table");
+    if (costBox) costBox.innerHTML = providersHtml;
+    $("#providers-table").innerHTML = providersHtml;
 
     $$(".btn-save-provider").forEach((btn) => btn.addEventListener("click", async () => {
       const row = btn.closest("tr");
@@ -804,6 +930,19 @@ function initUi() {
     } catch (err) {
       showError(err.message);
     }
+  });
+
+  $("#btn-billing-excel")?.addEventListener("click", async () => {
+    showError("");
+    try {
+      await downloadBillingExcel();
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+  $("#btn-billing-pdf")?.addEventListener("click", () => {
+    showError("");
+    printBillingPdf();
   });
 
   $("#btn-salsa-sync").addEventListener("click", async () => {

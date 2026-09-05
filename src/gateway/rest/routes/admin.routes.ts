@@ -191,7 +191,51 @@ router.get("/analytics/overview", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const { getAnalyticsOverview } = await import("../../../services/admin-analytics.service.js");
-  res.json(await getAnalyticsOverview(since, clientId));
+  const { getBillingReport } = await import("../../../services/billing-report.service.js");
+  const [overview, billing] = await Promise.all([
+    getAnalyticsOverview(since, clientId),
+    getBillingReport(since, clientId),
+  ]);
+  res.json({
+    ...overview,
+    ggr: billing.ggr,
+    invoiceable: billing.invoiceable,
+    salsaPayable: billing.salsaPayable,
+    yourEarn: billing.yourEarn,
+    aggregatorRevenue: billing.yourEarn,
+    settlementRule: billing.rule,
+  });
+});
+
+router.get("/billing/report", async (req, res) => {
+  const since = req.query.since ? String(req.query.since) : undefined;
+  const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
+  const { getBillingReport } = await import("../../../services/billing-report.service.js");
+  res.json(await getBillingReport(since, clientId));
+});
+
+router.get("/billing/spins", async (req, res) => {
+  const { getBillingSpins } = await import("../../../services/billing-report.service.js");
+  res.json(
+    await getBillingSpins({
+      since: req.query.since ? String(req.query.since) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      providerId: req.query.providerId ? Number(req.query.providerId) : undefined,
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : 25,
+    }),
+  );
+});
+
+router.get("/billing/export", async (req, res) => {
+  const since = req.query.since ? String(req.query.since) : undefined;
+  const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
+  const { buildBillingCsv } = await import("../../../services/billing-report.service.js");
+  const csv = await buildBillingCsv(since, clientId);
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="cobranca-${stamp}.csv"`);
+  res.send(csv);
 });
 
 router.get("/analytics/top-games", async (req, res) => {
@@ -566,6 +610,7 @@ router.put("/clients/:id/partner-access", async (req, res) => {
           z.object({
             providerId: z.number().int(),
             isEnabled: z.boolean(),
+            chargePct: z.number().min(0).max(50).nullable().optional(),
           }),
         )
         .min(1),

@@ -288,6 +288,16 @@ textarea {
 }
 @keyframes sync-spin { to { transform: rotate(360deg); } }
 
+.card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
+.value.bad { color: #fca5a5; }
+
+@media print {
+  .sidebar, .topbar, .nav, button, .inline-form { display: none !important; }
+  .app { display: block; height: auto; }
+  .main { overflow: visible; }
+  .panel { break-inside: avoid; }
+}
+
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; height: auto; overflow: visible; }
   .sidebar { border-right: none; border-bottom: 1px solid var(--border); }

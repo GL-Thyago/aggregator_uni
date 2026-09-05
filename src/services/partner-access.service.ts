@@ -17,7 +17,7 @@ export async function getPartnerProviderAccess(clientId: string) {
 
   const providers = await prisma.gameProvider.findMany({
     where: { integration: "SALSA" },
-    select: { id: true, slug: true, name: true, isActive: true },
+    select: { id: true, slug: true, name: true, displayName: true, isActive: true, defaultCostPct: true },
     orderBy: { name: "asc" },
   });
   const providerIds = providers.map((p) => p.id);
@@ -58,10 +58,18 @@ export async function getPartnerProviderAccess(clientId: string) {
     },
     providers: providers.map((p) => {
       const row = accessById.get(p.id);
+      const salsa = p.defaultCostPct != null ? Number(p.defaultCostPct) : salsaPct;
+      const charge = row?.chargePct != null ? Number(row.chargePct) : null;
+      const resolvedCharge = charge ?? resolvedChargePct;
       return {
         providerId: p.id,
         slug: p.slug,
-        name: p.name,
+        name: p.displayName?.trim() || p.name,
+        sourceName: p.name,
+        salsaPct: salsa,
+        chargePct: charge,
+        resolvedChargePct: resolvedCharge,
+        yourMarginPct: Math.max(0, Math.round((resolvedCharge - salsa) * 10) / 10),
         isActiveGlobal: p.isActive,
         gameCount: totalById.get(p.id) ?? 0,
         activeGameCount: activeById.get(p.id) ?? 0,
@@ -75,7 +83,11 @@ export async function savePartnerProviderAccess(
   clientId: string,
   input: {
     chargePct?: number | null;
-    providers: Array<{ providerId: number; isEnabled: boolean }>;
+    providers: Array<{
+      providerId: number;
+      isEnabled: boolean;
+      chargePct?: number | null;
+    }>;
   },
 ) {
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
@@ -102,9 +114,11 @@ export async function savePartnerProviderAccess(
         clientId,
         providerId: item.providerId,
         isEnabled: Boolean(item.isEnabled),
+        chargePct: item.chargePct ?? null,
       },
       update: {
         isEnabled: Boolean(item.isEnabled),
+        ...(item.chargePct !== undefined ? { chargePct: item.chargePct } : {}),
       },
     });
   }
