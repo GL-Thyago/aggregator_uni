@@ -188,7 +188,10 @@ model RefreshToken {
 model GameProvider {
   id             Int                 @id @default(autoincrement())
   slug           String              @unique
+  /// Nome técnico da Salsa / API (ex.: Pgsoft_ZNT). O sync atualiza isto.
   name           String
+  /// Nome no cassino. Null = usa `name`. O sync não sobrescreve.
+  displayName    String?             @map("display_name")
   isActive       Boolean             @default(true) @map("is_active")
   integration    ProviderIntegration @default(NATIVE)
   /// Custo padrão repassado ao provedor (% GGR) — ex.: Salsa Studio 6.5%

@@ -486,15 +486,17 @@ function renderSalsaGamesTable(data) {
   }
   $("#salsa-games-table").innerHTML = `<table>
     <thead><tr>
-      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>Status</th><th>Ações</th>
+      <th>Jogo</th><th>Código Salsa</th><th>Provedor</th><th>% Salsa</th><th>Status</th><th>Ações</th>
     </tr></thead>
     <tbody>${games.map((g) => `
       <tr data-game-id="${g.id}">
         <td><strong>${g.name}</strong><br><small>${g.slug}</small></td>
         <td><code>${g.externalGameId || "—"}</code></td>
-        <td>${g.provider?.name || "—"}</td>
+        <td>${g.provider?.displayName || g.provider?.name || "—"}</td>
+        <td><input class="rate-input salsa-game-cost" type="number" step="0.1" min="0" max="50" value="${g.providerCostPct ?? ""}"></td>
         <td class="${g.isActive ? "ok" : "bad"}">${g.isActive ? "Ativo" : "Off"}</td>
         <td>
+          <button class="ghost btn-save-salsa-cost">Salvar %</button>
           <button class="ghost btn-toggle-salsa-game" data-id="${g.id}" data-active="${g.isActive}">${g.isActive ? "Desligar" : "Ligar"}</button>
         </td>
       </tr>`).join("")}
@@ -504,6 +506,21 @@ function renderSalsaGamesTable(data) {
     const id = btn.dataset.id;
     const next = btn.dataset.active !== "true";
     await api(`/games/${id}`, { method: "PATCH", body: JSON.stringify({ isActive: next }) });
+    loadSalsaGamesPage(state.salsaGamesPage);
+  }));
+
+  $$(".btn-save-salsa-cost").forEach((btn) => btn.addEventListener("click", async () => {
+    const row = btn.closest("tr");
+    const id = row.dataset.gameId;
+    const providerCostPct = Number(row.querySelector(".salsa-game-cost").value);
+    if (!Number.isFinite(providerCostPct)) {
+      showError("Informe a % Salsa deste jogo.");
+      return;
+    }
+    await api(`/games/${id}/fees`, {
+      method: "PATCH",
+      body: JSON.stringify({ providerCostPct }),
+    });
     loadSalsaGamesPage(state.salsaGamesPage);
   }));
 
@@ -576,20 +593,54 @@ API live: https://api.salsagator.com
 
     $("#providers-table").innerHTML = `<table>
       <thead><tr>
-        <th>Provedor</th><th>Integração</th><th>Jogos</th><th>Ativos</th><th>Status</th><th>Ações</th>
+        <th>API / slug</th><th>Nome comercial</th><th>% Salsa</th><th>Jogos</th><th>Status</th><th>Ações</th>
       </tr></thead>
       <tbody>${providers.map((p) => `
-        <tr>
+        <tr data-provider-id="${p.id}">
           <td><strong>${p.name}</strong><br><small>${p.slug}</small></td>
-          <td>${p.integration || "NATIVE"}</td>
-          <td class="num">${p.gameCount ?? "—"}</td>
-          <td class="num">${p.activeGameCount ?? "—"}</td>
-          <td class="${p.isActive ? "ok" : "bad"}">${p.isActive ? "Ativo" : "Desativado"}</td>
+          <td><input class="prov-display-name" type="text" value="${p.displayName ?? ""}" placeholder="${p.name}"></td>
+          <td><input class="rate-input prov-cost" type="number" step="0.1" min="0" max="50" value="${p.defaultCostPct ?? ""}" placeholder="6.5"></td>
+          <td class="num">${p.activeGameCount ?? 0}/${p.gameCount ?? 0}</td>
+          <td class="${p.isActive ? "ok" : "bad"}">${p.isActive ? "Ativo" : "Off"}</td>
           <td>
+            <button class="ghost btn-save-provider">Salvar</button>
+            <button class="ghost btn-apply-provider-cost">Aplicar %</button>
             <button class="ghost btn-toggle-provider" data-id="${p.id}" data-active="${p.isActive}">${p.isActive ? "Desativar" : "Ativar"}</button>
           </td>
         </tr>`).join("")}
       </tbody></table>`;
+
+    $$(".btn-save-provider").forEach((btn) => btn.addEventListener("click", async () => {
+      const row = btn.closest("tr");
+      const id = row.dataset.providerId;
+      const displayName = row.querySelector(".prov-display-name").value.trim();
+      const costRaw = row.querySelector(".prov-cost").value;
+      const defaultCostPct = costRaw === "" ? null : Number(costRaw);
+      await api(`/providers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          displayName: displayName || null,
+          ...(Number.isFinite(defaultCostPct) ? { defaultCostPct } : { defaultCostPct: null }),
+        }),
+      });
+      loadIntegrationsView();
+    }));
+
+    $$(".btn-apply-provider-cost").forEach((btn) => btn.addEventListener("click", async () => {
+      const row = btn.closest("tr");
+      const id = row.dataset.providerId;
+      const costPct = Number(row.querySelector(".prov-cost").value);
+      if (!Number.isFinite(costPct)) {
+        showError("Informe a % Salsa do provedor antes de aplicar.");
+        return;
+      }
+      if (!confirm(`Aplicar ${costPct}% em todos os jogos deste provedor?`)) return;
+      await api(`/providers/${id}/apply-cost`, {
+        method: "POST",
+        body: JSON.stringify({ costPct }),
+      });
+      loadIntegrationsView();
+    }));
 
     $$(".btn-toggle-provider").forEach((btn) => btn.addEventListener("click", async () => {
       const id = btn.dataset.id;

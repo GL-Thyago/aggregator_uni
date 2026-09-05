@@ -246,6 +246,7 @@ textarea {
   word-break: break-all;
 }
 .rate-input { width: 72px; padding: 6px 8px; text-align: center; }
+.prov-display-name { width: 160px; padding: 6px 8px; }
 .config-pre {
   background: #0c0f16;
   border: 1px solid var(--border);

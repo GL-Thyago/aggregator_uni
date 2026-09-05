@@ -1079,7 +1079,7 @@ export async function listSalsaGames(options?: {
       integration: "SALSA",
       ...(options?.providerId && { id: options.providerId }),
     },
-    select: { id: true, slug: true, name: true, integration: true, defaultCostPct: true, isActive: true },
+    select: { id: true, slug: true, name: true, displayName: true, integration: true, defaultCostPct: true, isActive: true },
   });
 
   const providerIds = providers.map((p) => p.id);
@@ -1102,7 +1102,7 @@ export async function listSalsaGames(options?: {
     prisma.game.findMany({
       where,
       include: {
-        provider: { select: { id: true, slug: true, name: true, integration: true } },
+        provider: { select: { id: true, slug: true, name: true, displayName: true, integration: true } },
         category: { select: { id: true, slug: true, name: true } },
       },
       orderBy: [{ providerId: "asc" }, { name: "asc" }],

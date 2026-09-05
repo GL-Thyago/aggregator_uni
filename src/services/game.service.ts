@@ -23,8 +23,16 @@ type GameWithRelations = {
   aggregatorFeePct: unknown;
   isFeatured: boolean;
   category: { id: number; slug: string; name: string };
-  provider: { id: number; slug: string; name: string };
+  provider: { id: number; slug: string; name: string; displayName?: string | null };
 };
+
+export function resolveProviderLabel(provider: {
+  name: string;
+  displayName?: string | null;
+}): string {
+  const custom = provider.displayName?.trim();
+  return custom || provider.name;
+}
 
 export function resolveGamesDir(): string {
   return path.resolve(process.cwd(), env.GAMES_DIR);
@@ -82,9 +90,10 @@ export function toClientGameDto(g: GameWithRelations) {
     thumbnailUrl: resolveThumbnailUrl(g),
     isFeatured: g.isFeatured,
     sortOrder: g.sortOrder,
-    provider: g.provider.name,
-    providerName: g.provider.name,
+    provider: resolveProviderLabel(g.provider),
+    providerName: resolveProviderLabel(g.provider),
     providerSlug: g.provider.slug,
+    providerSourceName: g.provider.name,
     gameType: g.gameType,
     playMode: external ? ("external" as const) : ("embedded" as const),
     ...(g.rtp !== undefined ? { rtp: decimalToString(g.rtp) } : {}),
@@ -119,7 +128,7 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       isFeatured: true,
       sortOrder: true,
       category: { select: { id: true, slug: true, name: true } },
-      provider: { select: { id: true, slug: true, name: true } },
+      provider: { select: { id: true, slug: true, name: true, displayName: true } },
     },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
   });

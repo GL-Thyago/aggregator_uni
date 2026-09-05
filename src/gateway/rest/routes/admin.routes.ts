@@ -414,9 +414,10 @@ router.patch("/providers/:id", async (req, res) => {
     return;
   }
 
-  const { isActive, name, defaultCostPct, integration } = req.body as {
+  const { isActive, name, displayName, defaultCostPct, integration } = req.body as {
     isActive?: boolean;
     name?: string;
+    displayName?: string | null;
     defaultCostPct?: number | null;
     integration?: "NATIVE" | "SALSA" | "DIRECT";
   };
@@ -428,6 +429,7 @@ router.patch("/providers/:id", async (req, res) => {
     data: {
       ...(isActive !== undefined && { isActive }),
       ...(name !== undefined && { name }),
+      ...(displayName !== undefined && { displayName: displayName?.trim() || null }),
       ...(defaultCostPct !== undefined && { defaultCostPct }),
       ...(integration !== undefined && { integration }),
     },

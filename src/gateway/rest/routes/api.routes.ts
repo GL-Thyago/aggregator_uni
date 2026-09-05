@@ -209,11 +209,20 @@ router.post("/session/spin", sessionMiddleware, async (req, res) => {
 });
 
 router.get("/catalog/providers", authMiddleware, async (_req, res) => {
+  const { resolveProviderLabel } = await import("../../../services/game.service.js");
   const providers = await prisma.gameProvider.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
   });
-  res.json(serializeBigInt(providers));
+  res.json(
+    serializeBigInt(
+      providers.map((p) => ({
+        ...p,
+        name: resolveProviderLabel(p),
+        sourceName: p.name,
+      })),
+    ),
+  );
 });
 
 router.get("/catalog/categories", authMiddleware, async (_req, res) => {
