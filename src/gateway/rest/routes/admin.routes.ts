@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../../lib/prisma.js";
+import { ensureSchemaPatches, prisma } from "../../../lib/prisma.js";
 import { generateApiKey, hashApiKey, serializeBigInt } from "../../../lib/utils.js";
 import { adminMiddleware } from "../../../auth/middleware.js";
 import { refreshClientEntitlements } from "../../../entitlements/entitlement.service.js";
@@ -208,6 +208,7 @@ router.get("/analytics/overview", async (req, res) => {
 });
 
 router.get("/billing/report", async (req, res) => {
+  await ensureSchemaPatches();
   const since = req.query.since ? String(req.query.since) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const { getBillingReport } = await import("../../../services/billing-report.service.js");
@@ -407,6 +408,7 @@ router.post("/categories", async (req, res) => {
 });
 
 router.get("/providers", async (_req, res) => {
+  await ensureSchemaPatches();
   const providers = await prisma.gameProvider.findMany({
     include: { _count: { select: { games: true } } },
     orderBy: { name: "asc" },

@@ -14,17 +14,17 @@ function parseSince(query?: string): Date {
 }
 
 export function settleGgr(ggr: number, salsaPct: number, chargePct: number) {
-  const billableGgr = Math.max(0, ggr);
-  const chargeAmount = round2((billableGgr * chargePct) / 100);
-  const salsaDue = round2((billableGgr * salsaPct) / 100);
+  const signed = round2(ggr);
+  const chargeAmount = round2((signed * chargePct) / 100);
+  const salsaDue = round2((signed * salsaPct) / 100);
   return {
-    ggr: round2(ggr),
-    billableGgr: round2(billableGgr),
+    ggr: signed,
+    billableGgr: signed,
     salsaPct,
     chargePct,
     chargeAmount,
     salsaDue,
-    yourEarn: round2(Math.max(0, chargeAmount - salsaDue)),
+    yourEarn: round2(chargeAmount - salsaDue),
   };
 }
 
@@ -222,19 +222,18 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
       betAmount: round2(row.betAmount),
       winAmount: round2(row.winAmount),
       ggr: round2(ggr),
-      billableGgr: round2(Math.max(0, ggr)),
+      billableGgr: round2(ggr),
       chargeAmount,
       salsaDue,
-      yourEarn: round2(Math.max(0, chargeAmount - salsaDue)),
+      yourEarn: round2(chargeAmount - salsaDue),
       providers: slices.sort((a, b) => b.betAmount - a.betAmount),
     };
   }).sort((a, b) => b.betAmount - a.betAmount);
 
   const totalGgr = round2(betAmount - winAmount);
   const invoiceable = round2(clientRows.reduce((s, c) => s + c.chargeAmount, 0));
-  const salsaIfPositive = round2(clientRows.reduce((s, c) => s + c.salsaDue, 0));
-  const salsaPayable = totalGgr > 0 ? salsaIfPositive : 0;
-  const yourEarnOverall = totalGgr > 0 ? round2(Math.max(0, invoiceable - salsaPayable)) : 0;
+  const salsaPayable = round2(clientRows.reduce((s, c) => s + c.salsaDue, 0));
+  const yourEarnOverall = round2(clientRows.reduce((s, c) => s + c.yourEarn, 0));
 
   return {
     since: since.toISOString(),
@@ -248,9 +247,7 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
     salsaPayable,
     yourEarn: clientId ? (clientRows[0]?.yourEarn ?? 0) : yourEarnOverall,
     rule:
-      totalGgr <= 0 && !clientId
-        ? "GGR geral ≤ 0: você não ganha no consolidado e não repassa à Salsa. Clientes positivos ainda podem ser cobrados."
-        : "Você cobra só o GGR positivo de cada cliente. Salsa só entra se o GGR daquele recorte for > 0.",
+      "Cobrança = % × GGR real (pode ser negativo). A soma dos provedores fecha com o total do cliente.",
     clients: clientRows,
     providers: providerRows.sort((a, b) => b.betAmount - a.betAmount),
   };

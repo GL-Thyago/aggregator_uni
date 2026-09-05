@@ -36,6 +36,12 @@ function setNamedField(form, name, value, { checkbox = false } = {}) {
   else el.value = value ?? "";
 }
 
+function setHtml(sel, html) {
+  const el = typeof sel === "string" ? $(sel) : sel;
+  if (!el) return;
+  el.innerHTML = html;
+}
+
 function showError(msg) {
   const el = $("#global-error");
   if (!msg) {
@@ -135,9 +141,9 @@ function renderOverviewCards(data) {
     { label: "Apostado", value: money(data.betAmount) },
     { label: "Prêmios", value: money(data.playerPayout ?? data.winAmount), sub: "Pago aos jogadores" },
     { label: "GGR", value: money(ggr), sub: "Apostado − prêmios", cls: ggr < 0 ? "bad" : "" },
-    { label: "Seu ganho", value: money(earn), sub: ggr <= 0 && !state.selectedClientId ? "GGR geral ≤ 0 · sem ganho" : "Só do GGR positivo", cls: earn > 0 ? "ok" : "" },
-    { label: "A pagar Salsa", value: money(data.salsaPayable ?? 0), sub: ggr <= 0 ? "GGR ≤ 0 · não repassa" : "Sobre o GGR positivo" },
-    { label: "A cobrar clientes", value: money(data.invoiceable ?? 0), sub: "Só quem fechou positivo" },
+    { label: "Seu ganho", value: money(earn), sub: "% cobrança − % Salsa sobre o GGR", cls: earn > 0 ? "ok" : earn < 0 ? "bad" : "" },
+    { label: "A pagar Salsa", value: money(data.salsaPayable ?? 0), sub: "% Salsa × GGR (pode ser negativo)" },
+    { label: "A cobrar clientes", value: money(data.invoiceable ?? 0), sub: "% cobrança × GGR total" },
     { label: "Spins", value: data.spinCount.toLocaleString("pt-BR") },
     { label: "Clientes ativos", value: data.activeClients },
   ].map((c) => `
@@ -165,7 +171,7 @@ function renderClientMovement(rows) {
         <td class="num">${r.spins}</td>
         <td class="num">${money(r.betAmount)}</td>
         <td class="num">${money(r.winAmount)}</td>
-        <td class="num ${r.ggr > 0 ? "ok" : ""}">${money(Math.max(0, r.ggr))}</td>
+        <td class="num ${r.ggr < 0 ? "bad" : r.ggr > 0 ? "ok" : ""}">${money(r.ggr)}</td>
         <td class="num ${r.walletBalance < 0 ? "bad" : ""}">${money(r.walletBalance)}</td>
         <td>${new Date(r.lastActivity).toLocaleString("pt-BR")}</td>
       </tr>`).join("")}
@@ -442,20 +448,21 @@ function readPartnerAccessFromTable() {
 
 function renderBillingSummary(report) {
   const ggr = report.ggr ?? 0;
-  $("#billing-summary").innerHTML = [
+  setHtml("#billing-summary", [
     { label: "Apostado", value: money(report.betAmount) },
     { label: "Prêmios", value: money(report.winAmount) },
     { label: "GGR", value: money(ggr), cls: ggr < 0 ? "bad" : "" },
-    { label: "A cobrar", value: money(report.invoiceable), sub: "Clientes positivos" },
-    { label: "A pagar Salsa", value: money(report.salsaPayable) },
-    { label: "Seu ganho", value: money(report.yourEarn), cls: report.yourEarn > 0 ? "ok" : "" },
+    { label: "A cobrar", value: money(report.invoiceable), sub: "% × GGR total", cls: report.invoiceable < 0 ? "bad" : "" },
+    { label: "A pagar Salsa", value: money(report.salsaPayable), cls: report.salsaPayable < 0 ? "bad" : "" },
+    { label: "Seu ganho", value: money(report.yourEarn), cls: report.yourEarn > 0 ? "ok" : report.yourEarn < 0 ? "bad" : "" },
   ].map((c) => `
     <div class="card">
       <div class="label">${c.label}</div>
       <div class="value ${c.cls || ""}">${c.value}</div>
       ${c.sub ? `<div class="sub">${c.sub}</div>` : ""}
-    </div>`).join("");
-  $("#billing-rule").textContent = report.rule || "";
+    </div>`).join(""));
+  const rule = $("#billing-rule");
+  if (rule) rule.textContent = report.rule || "";
 }
 
 async function loadRevenueView() {
@@ -466,7 +473,7 @@ async function loadRevenueView() {
     state.billingReport = report;
     renderBillingSummary(report);
 
-    $("#billing-clients-table").innerHTML = report.clients.length ? `<table>
+    setHtml("#billing-clients-table", report.clients.length ? `<table>
       <thead><tr>
         <th>Cliente</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>A cobrar</th><th>Salsa</th><th>Seu ganho</th>
       </tr></thead>
@@ -477,9 +484,9 @@ async function loadRevenueView() {
           <td class="num">${money(c.betAmount)}</td>
           <td class="num">${money(c.winAmount)}</td>
           <td class="num ${c.ggr < 0 ? "bad" : "ok"}">${money(c.ggr)}</td>
-          <td class="num">${money(c.chargeAmount)}</td>
-          <td class="num">${money(c.salsaDue)}</td>
-          <td class="num ok">${money(c.yourEarn)}</td>
+          <td class="num ${c.chargeAmount < 0 ? "bad" : ""}">${money(c.chargeAmount)}</td>
+          <td class="num ${c.salsaDue < 0 ? "bad" : ""}">${money(c.salsaDue)}</td>
+          <td class="num ${c.yourEarn < 0 ? "bad" : "ok"}">${money(c.yourEarn)}</td>
         </tr>`).join("")}
       </tbody></table>` : "<p class='hint'>Sem movimento no período.</p>";
 
@@ -489,7 +496,7 @@ async function loadRevenueView() {
       loadRevenueView();
     }));
 
-    $("#billing-providers-table").innerHTML = report.providers.length ? `<table>
+    setHtml("#billing-providers-table", report.providers.length ? `<table>
       <thead><tr>
         <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>
       </tr></thead>
@@ -503,8 +510,8 @@ async function loadRevenueView() {
           <td class="num ${p.ggr < 0 ? "bad" : "ok"}">${money(p.ggr)}</td>
           <td class="num">${p.salsaPct}%</td>
           <td class="num">${p.chargePct}%</td>
-          <td class="num">${money(p.chargeAmount)}</td>
-          <td class="num ok">${money(p.yourEarn)}</td>
+          <td class="num ${p.chargeAmount < 0 ? "bad" : ""}">${money(p.chargeAmount)}</td>
+          <td class="num ${p.yourEarn < 0 ? "bad" : "ok"}">${money(p.yourEarn)}</td>
         </tr>`).join("")}
       </tbody></table>` : "<p class='hint'>Sem dados por provedor.</p>";
 
@@ -517,7 +524,7 @@ async function loadRevenueView() {
 async function loadBillingSpins(page = 1) {
   state.billingSpinsPage = page;
   const data = await api("/billing/spins" + qs({ page, pageSize: 25 }));
-  $("#billing-spins-table").innerHTML = data.spins.length ? `<table>
+  setHtml("#billing-spins-table", data.spins.length ? `<table>
     <thead><tr>
       <th>Data</th><th>Cliente</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th>
     </tr></thead>
@@ -537,7 +544,7 @@ async function loadBillingSpins(page = 1) {
 
   const from = data.total ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = Math.min(data.page * data.pageSize, data.total);
-  $("#billing-spins-pager").innerHTML = `
+  setHtml("#billing-spins-pager", `
     <span class="pager-info">${from}–${to} de ${data.total}</span>
     <button type="button" class="ghost" id="billing-prev" ${data.page <= 1 ? "disabled" : ""}>Anterior</button>
     <span>Pág. ${data.page} / ${data.pages}</span>
@@ -672,12 +679,12 @@ async function loadIntegrationsView() {
   try {
     const [salsa, providers, salsaCfg] = await Promise.all([
       api("/integrations/salsa/status"),
-      api("/providers"),
+      api("/providers").catch(() => []),
       api("/integrations/salsa/config").catch(() => null),
     ]);
 
     const liveReady = Boolean(salsa.live?.ready || salsaCfg?.live?.ready);
-    $("#salsa-status").innerHTML = [
+    setHtml("#salsa-status", [
       { label: "Salsa ativa", value: (salsaCfg?.enabled ?? salsa.enabled) ? "Sim" : "Não", cls: (salsaCfg?.enabled ?? salsa.enabled) ? "ok" : "warn" },
       { label: "PN teste", value: salsa.test?.pn || salsa.pn || "—" },
       { label: "PN produção", value: salsa.live?.pn || "ainda vazio no env", cls: liveReady ? "ok" : "warn" },
@@ -685,7 +692,7 @@ async function loadIntegrationsView() {
       { label: "Jogos ativos", value: salsa.gamesActive ?? "—", cls: salsa.gamesActive ? "ok" : "warn" },
       { label: "% Salsa", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
       { label: "% operador", value: (salsaCfg?.defaultOperatorChargePct ?? "—") + "%" },
-    ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
+    ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join(""));
 
     if (salsaCfg) {
       const form = $("#salsa-config-form");
@@ -713,8 +720,30 @@ API live: https://api.salsagator.com
 # Publicar 5069 jogos não muda o PN. Só libera o catálogo.`;
 
     await loadSalsaGamesPage(state.salsaGamesPage);
+    renderProviderCostControls(Array.isArray(providers) ? providers : []);
+    bindProviderTableActions();
 
-    const providersHtml = `<table>
+  } catch (e) {
+    showError(e.message);
+    renderProviderCostControls([]);
+  }
+}
+
+function renderProviderCostControls(providers) {
+  const select = $("#provider-cost-select");
+  const emptyHint = $("#provider-cost-empty");
+  if (select) {
+    const current = select.value;
+    select.innerHTML = '<option value="">Escolha o provedor</option>' +
+      providers.map((p) => {
+        const label = (p.displayName || p.name || p.slug) + (p.defaultCostPct != null ? ` (${p.defaultCostPct}%)` : "");
+        return `<option value="${p.id}" data-cost="${p.defaultCostPct ?? ""}">${label}</option>`;
+      }).join("");
+    if ([...select.options].some((o) => o.value === current)) select.value = current;
+  }
+  if (emptyHint) emptyHint.hidden = providers.length > 0;
+
+  const providersHtml = providers.length ? `<table>
       <thead><tr>
         <th>API / slug</th><th>Nome comercial</th><th>% Salsa</th><th>Jogos</th><th>Status</th><th>Ações</th>
       </tr></thead>
@@ -731,11 +760,13 @@ API live: https://api.salsagator.com
             <button class="ghost btn-toggle-provider" data-id="${p.id}" data-active="${p.isActive}">${p.isActive ? "Desativar" : "Ativar"}</button>
           </td>
         </tr>`).join("")}
-      </tbody></table>`;
-    const costBox = $("#providers-cost-table");
-    if (costBox) costBox.innerHTML = providersHtml;
-    $("#providers-table").innerHTML = providersHtml;
+      </tbody></table>` : "<p class='hint'>Nenhum provedor ainda. Importa o código Salsa (ex.: 46) no bloco abaixo.</p>";
 
+  setHtml("#providers-cost-table", providersHtml);
+  setHtml("#providers-table", providersHtml);
+}
+
+function bindProviderTableActions() {
     $$(".btn-save-provider").forEach((btn) => btn.addEventListener("click", async () => {
       const row = btn.closest("tr");
       const id = row.dataset.providerId;
@@ -780,9 +811,6 @@ API live: https://api.salsagator.com
       });
       loadIntegrationsView();
     }));
-  } catch (e) {
-    showError(e.message);
-  }
 }
 
 async function loadHighlightsView() {
@@ -930,6 +958,50 @@ function initUi() {
     } catch (err) {
       showError(err.message);
     }
+  });
+
+  $("#provider-cost-select")?.addEventListener("change", () => {
+    const opt = $("#provider-cost-select")?.selectedOptions?.[0];
+    const cost = opt?.dataset?.cost;
+    if (cost != null && $("#provider-cost-pct")) $("#provider-cost-pct").value = cost;
+  });
+
+  $("#provider-cost-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("#provider-cost-select")?.value;
+    const costPct = Number($("#provider-cost-pct")?.value);
+    if (!id) {
+      showError("Escolha o provedor.");
+      return;
+    }
+    if (!Number.isFinite(costPct)) {
+      showError("Informe a % Salsa.");
+      return;
+    }
+    showError("");
+    await api(`/providers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ defaultCostPct: costPct }),
+    });
+    await loadIntegrationsView();
+    alert(" % Salsa do provedor salva.");
+  });
+
+  $("#btn-apply-selected-cost")?.addEventListener("click", async () => {
+    const id = $("#provider-cost-select")?.value;
+    const costPct = Number($("#provider-cost-pct")?.value);
+    if (!id || !Number.isFinite(costPct)) {
+      showError("Escolha o provedor e a % Salsa.");
+      return;
+    }
+    if (!confirm(`Aplicar ${costPct}% em todos os jogos deste provedor?`)) return;
+    showError("");
+    await api(`/providers/${id}/apply-cost`, {
+      method: "POST",
+      body: JSON.stringify({ costPct }),
+    });
+    await loadIntegrationsView();
+    alert(" % aplicada aos jogos.");
   });
 
   $("#btn-billing-excel")?.addEventListener("click", async () => {

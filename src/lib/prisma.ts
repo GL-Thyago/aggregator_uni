@@ -23,6 +23,19 @@ if (env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
+let schemaReady: Promise<void> | null = null;
+
+/** Garante colunas novas sem exigir prisma db push no servidor. */
+export function ensureSchemaPatches() {
+  if (!schemaReady) {
+    schemaReady = prisma
+      .$executeRawUnsafe(`ALTER TABLE game_providers ADD COLUMN IF NOT EXISTS display_name TEXT`)
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  return schemaReady;
+}
+
 export async function disconnectPrisma(): Promise<void> {
   await prisma.$disconnect();
 }
