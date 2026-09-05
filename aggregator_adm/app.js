@@ -757,17 +757,25 @@ function initUi() {
 
   $("#btn-salsa-sync").addEventListener("click", async () => {
     showError("");
+    const provider = Number($("#salsa-provider-id")?.value);
+    if (!Number.isInteger(provider) || provider < 1) {
+      showError("Informe o código do provedor Salsa (ex.: 46).");
+      return;
+    }
     const overlay = $("#salsa-sync-overlay");
     const msg = $("#salsa-sync-msg");
     const detail = $("#salsa-sync-detail");
     const btn = $("#btn-salsa-sync");
     overlay?.classList.remove("hidden");
     btn.disabled = true;
-    if (msg) msg.textContent = "A iniciar importação…";
-    if (detail) detail.textContent = "Isto pode levar alguns minutos. Não feche a página.";
+    if (msg) msg.textContent = `A importar provider=${provider}…`;
+    if (detail) detail.textContent = "Só este estúdio. Não feche a página.";
 
     try {
-      await api("/integrations/salsa/sync", { method: "POST", body: "{}" });
+      await api("/integrations/salsa/sync?provider=" + provider, {
+        method: "POST",
+        body: JSON.stringify({ provider }),
+      });
 
       const started = Date.now();
       while (Date.now() - started < 15 * 60 * 1000) {
@@ -775,17 +783,18 @@ function initUi() {
         const status = await api("/integrations/salsa/sync");
         if (msg) msg.textContent = status.phase || "A importar…";
         if (detail) {
+          const ids = (status.targetProviders || []).join(", ");
           detail.textContent = status.found
-            ? `Provedores com jogos: ${status.found} · varrido até ${status.scanned || "—"}`
-            : "A pedir o catálogo à Salsa (TaDa = provider 331 primeiro)…";
+            ? `Provedor ${ids || provider}: ${status.found} estúdio(s) com jogos`
+            : `A pedir provider=${ids || provider} à Salsa…`;
         }
         if (status.running) continue;
         if (status.error) throw new Error(status.error);
         const result = status.result || {};
         alert(
-          `Sync OK: ${result.created ?? 0} novos, ${result.updated ?? 0} atualizados` +
-            `\nCapas URL: ${result.logosFromUrl ?? 0} · BASE64: ${result.logosFromBase64 ?? 0}` +
-            (result.fromCache ? "\n(usou cache — se a TaDa faltar, espera 24h e importa de novo)" : ""),
+          `Sync OK (provider ${ (result.providerIds || [provider]).join(", ") }): ${result.created ?? 0} novos, ${result.updated ?? 0} atualizados` +
+            `\nEstúdio: ${(result.providerNames || []).join(", ") || "—"}` +
+            `\nCapas URL: ${result.logosFromUrl ?? 0} · BASE64: ${result.logosFromBase64 ?? 0}`,
         );
         break;
       }
@@ -795,6 +804,22 @@ function initUi() {
     } finally {
       overlay?.classList.add("hidden");
       btn.disabled = false;
+    }
+  });
+
+  $("#btn-salsa-reset-catalog")?.addEventListener("click", async () => {
+    showError("");
+    if (!confirm(
+      "Apagar os jogos importados da Salsa e o quanto cada um jogou (sessões + estatísticas)?\n\nClientes, saldos e jogos nativos ficam. Depois importe de novo só o código que a Salsa liberou (ex.: 46).",
+    )) return;
+    try {
+      const result = await api("/integrations/salsa/reset-catalog", { method: "POST", body: "{}" });
+      alert(
+        `Catálogo Salsa limpo: ${result.gamesDeleted ?? 0} jogos, ${result.sessionsDeleted ?? 0} sessões, ${result.providersDeleted ?? 0} provedores.\nAgora importe um código (ex.: 46).`,
+      );
+      loadIntegrationsView();
+    } catch (e) {
+      showError(e.message);
     }
   });
 

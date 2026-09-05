@@ -210,10 +210,14 @@
           <p class="hint">Este formulário é o ambiente de <strong>TESTE</strong> (staging). Produção fica no EasyPanel: <code>SALSA_PN_LIVE</code> + <code>SALSA_HASH_KEY_LIVE</code>. O seletor no topo da página é o <strong>cassino</strong>, não o ambiente Salsa. Cada cliente escolhe Teste ou Produção na aba Clientes.</p>
           <div id="salsa-status" class="cards"></div>
           <div class="inline-form">
-            <button id="btn-salsa-sync">Importar jogos do JSON Salsa</button>
+            <label>Código do provedor Salsa
+              <input id="salsa-provider-id" type="number" min="1" step="1" placeholder="46">
+            </label>
+            <button id="btn-salsa-sync">Importar este provedor</button>
+            <button id="btn-salsa-reset-catalog" class="ghost danger">Limpar jogos Salsa e estatísticas</button>
             <button id="btn-salsa-deactivate" class="ghost danger">Desativar todo o catálogo Salsa</button>
           </div>
-          <p class="hint">O import só atualiza nomes, IDs e capas. <strong>Não liga jogos</strong>. Depois: Integrações → ativar um provedor → Sócios → liberar.</p>
+          <p class="hint">Passe só o número que a Salsa liberou (ex.: <code>46</code>). O sistema pede <code>?provider=46</code> à Salsa e baixa jogos + capas daquele estúdio. <strong>Não varre o catálogo inteiro</strong> — assim não entram jogos PG/outros que ainda não foram liberados. O import não liga jogos: depois ative o provedor e liberte na aba Sócios.</p>
           <form id="salsa-config-form" class="form-grid" style="margin-top:1rem">
             <label><input type="checkbox" name="enabled"> Salsa ativa</label>
             <label>PN teste (staging)<input name="publisherName" placeholder="rg-games-staging"></label>

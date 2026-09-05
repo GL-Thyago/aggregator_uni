@@ -230,6 +230,54 @@ async function fetchSalsaProviderPage(
   }
 }
 
+export function parseSalsaProviderIds(...inputs: unknown[]): number[] {
+  const ids = new Set<number>();
+  for (const input of inputs) {
+    if (input == null || input === "") continue;
+    const parts = Array.isArray(input) ? input : String(input).split(/[,\s]+/);
+    for (const part of parts) {
+      const n = Number(part);
+      if (Number.isInteger(n) && n > 0 && n < 10_000) ids.add(n);
+    }
+  }
+  return [...ids];
+}
+
+/** Pede só os códigos que a Salsa liberou (ex.: 46). Não varre 1–400. */
+export async function fetchSalsaProvidersByIds(
+  rawUrl: string,
+  providerIds: number[],
+  onProgress?: (info: { phase: string; scanned: number; found: number }) => void,
+): Promise<SalsaCatalogSnapshot> {
+  const unique = parseSalsaProviderIds(providerIds);
+  const base = catalogBaseUrl(rawUrl);
+  const bySlug = new Map<string, SalsaProviderJson>();
+  const foundIds: number[] = [];
+  let scanned = 0;
+  let rateLimited: string | null = null;
+
+  for (const id of unique) {
+    onProgress?.({ phase: `a pedir provider=${id} à Salsa…`, scanned, found: foundIds.length });
+    const page = await fetchSalsaProviderPage(base, id);
+    scanned = id;
+    if (page.rateLimited) {
+      rateLimited = page.rateLimited;
+      break;
+    }
+    if (!page.providers.length) continue;
+    foundIds.push(id);
+    mergeProviderPage(bySlug, page.providers, id);
+    onProgress?.({ phase: `provider=${id} · ${page.providers[0]?.providerName ?? "ok"}`, scanned, found: foundIds.length });
+  }
+
+  return {
+    providers: [...bySlug.values()],
+    scanned,
+    foundIds,
+    rateLimited,
+  };
+}
+
 /** A Salsa exige `provider=N` por request. Sem o param a API devolve 400.
  *  IDs não são contínuos (PG Soft=42, Evolution=126…). Parar nos primeiros 400
  *  deixa o cassino só com os estúdios da Salsa. A API também trava 24h após um dump. */
@@ -714,9 +762,21 @@ export async function syncSalsaGamesFromSource(options?: {
   gameListUrl?: string;
   activateProvider?: boolean;
   defaultCostPct?: number;
+  salsaProviderIds?: number[];
+  scanAll?: boolean;
+  resetCatalog?: boolean;
   onProgress?: (info: { phase: string; scanned?: number; found?: number }) => void;
 }) {
+  const salsaProviderIds = parseSalsaProviderIds(options?.salsaProviderIds);
+  if (!salsaProviderIds.length && !options?.scanAll) {
+    throw new Error("Passe o código do provedor Salsa. Ex.: ?provider=46");
+  }
+
   options?.onProgress?.({ phase: "a ligar à Salsa…" });
+  if (options?.resetCatalog) {
+    options.onProgress?.({ phase: "a limpar catálogo Salsa e estatísticas…" });
+    await purgeImportedSalsaCatalog();
+  }
   await hideNonSalsaCatalog();
 
   const cfg = await getSalsaRuntimeConfig();
@@ -725,12 +785,19 @@ export async function syncSalsaGamesFromSource(options?: {
     throw new Error("SALSA_GAME_LIST_URL não configurada — peça a URL do JSON à Salsa");
   }
 
-  const catalog = await fetchAllSalsaProviders(url, options?.onProgress);
+  const catalog = salsaProviderIds.length
+    ? await fetchSalsaProvidersByIds(url, salsaProviderIds, options?.onProgress)
+    : await fetchAllSalsaProviders(url, options?.onProgress);
   const providers = catalog.providers;
   if (!providers.length) {
     if (catalog.rateLimited) {
       throw new Error(
-        `A Salsa limita o download do catálogo a 1 vez / 24h (${catalog.rateLimited}). Espere o prazo e rode npm run salsa:sync de novo — o scanner agora varre PG Soft, Pragmatic e os demais IDs.`,
+        `A Salsa limita o download do catálogo a 1 vez / 24h (${catalog.rateLimited}). Espere o prazo e importe só o código liberado (ex.: provider=46).`,
+      );
+    }
+    if (salsaProviderIds.length) {
+      throw new Error(
+        `A Salsa não devolveu jogos para provider=${salsaProviderIds.join(",")}. Esse código ainda não foi liberado nesta conta, ou o PN/URL está errado.`,
       );
     }
     throw new Error("JSON da Salsa não contém providers — confira a URL / PN");
@@ -840,6 +907,61 @@ export async function syncSalsaGamesFromSource(options?: {
     fromCache: Boolean(catalog.fromCache),
     rateLimited: catalog.rateLimited ?? null,
     published: { providersActivated: 0, gamesActivated: 0 },
+  };
+}
+
+/** Apaga jogos importados da Salsa e o quanto cada um jogou. Clientes, saldos e jogos nativos ficam. */
+export async function purgeImportedSalsaCatalog() {
+  const salsaProviders = await prisma.gameProvider.findMany({
+    where: { integration: "SALSA" },
+    select: { id: true },
+  });
+  const providerIds = salsaProviders.map((p) => p.id);
+  const keepWhere = {
+    OR: [{ slug: "gpi-validation" }, { externalGameId: "gpi-validation" }],
+  };
+
+  const games = providerIds.length
+    ? await prisma.game.findMany({
+        where: { providerId: { in: providerIds }, NOT: keepWhere },
+        select: { id: true },
+      })
+    : [];
+  const gameIds = games.map((g) => g.id);
+
+  const sessions = gameIds.length
+    ? await prisma.gameSession.deleteMany({ where: { gameId: { in: gameIds } } })
+    : { count: 0 };
+
+  const deletedGames = gameIds.length
+    ? await prisma.game.deleteMany({ where: { id: { in: gameIds } } })
+    : { count: 0 };
+
+  const remaining = providerIds.length
+    ? await prisma.game.groupBy({
+        by: ["providerId"],
+        where: { providerId: { in: providerIds } },
+      })
+    : [];
+  const remainingIds = new Set(remaining.map((r) => r.providerId));
+  const emptyIds = providerIds.filter((id) => !remainingIds.has(id));
+
+  const deletedProviders = emptyIds.length
+    ? await prisma.gameProvider.deleteMany({ where: { id: { in: emptyIds } } })
+    : { count: 0 };
+
+  try {
+    if (fs.existsSync(CATALOG_CACHE_PATH)) fs.unlinkSync(CATALOG_CACHE_PATH);
+  } catch {
+    /* cache is optional */
+  }
+
+  await ensureGpiValidationGame();
+
+  return {
+    gamesDeleted: deletedGames.count,
+    sessionsDeleted: sessions.count,
+    providersDeleted: deletedProviders.count,
   };
 }
 
@@ -1061,6 +1183,7 @@ type SalsaSyncJob = {
   phase: string;
   scanned: number;
   found: number;
+  targetProviders: number[];
   error: string | null;
   result: Record<string, unknown> | null;
   startedAt: number | null;
@@ -1072,6 +1195,7 @@ const salsaSyncJob: SalsaSyncJob = {
   phase: "idle",
   scanned: 0,
   found: 0,
+  targetProviders: [],
   error: null,
   result: null,
   startedAt: null,
@@ -1086,13 +1210,20 @@ export function startSalsaCatalogSync(options?: {
   gameListUrl?: string;
   activateProvider?: boolean;
   defaultCostPct?: number;
+  salsaProviderIds?: number[];
+  scanAll?: boolean;
+  resetCatalog?: boolean;
 }): SalsaSyncJob {
   if (salsaSyncJob.running) return getSalsaCatalogSyncStatus();
 
+  const salsaProviderIds = parseSalsaProviderIds(options?.salsaProviderIds);
   salsaSyncJob.running = true;
-  salsaSyncJob.phase = "a iniciar importação…";
+  salsaSyncJob.phase = salsaProviderIds.length
+    ? `a importar provider=${salsaProviderIds.join(",")}`
+    : "a iniciar importação…";
   salsaSyncJob.scanned = 0;
   salsaSyncJob.found = 0;
+  salsaSyncJob.targetProviders = salsaProviderIds;
   salsaSyncJob.error = null;
   salsaSyncJob.result = null;
   salsaSyncJob.startedAt = Date.now();
@@ -1101,6 +1232,9 @@ export function startSalsaCatalogSync(options?: {
   void syncSalsaGamesFromSource({
     gameListUrl: options?.gameListUrl,
     defaultCostPct: options?.defaultCostPct,
+    salsaProviderIds,
+    scanAll: options?.scanAll,
+    resetCatalog: options?.resetCatalog,
     onProgress: (info) => {
       salsaSyncJob.phase = info.phase;
       if (info.scanned != null) salsaSyncJob.scanned = info.scanned;

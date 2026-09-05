@@ -481,12 +481,31 @@ router.get("/integrations/salsa/last-request", async (_req, res) => {
 });
 
 router.post("/integrations/salsa/sync", async (req, res) => {
-  const { startSalsaCatalogSync } = await import("../../../services/salsa/salsa-sync.service.js");
+  const { parseSalsaProviderIds, startSalsaCatalogSync } = await import(
+    "../../../services/salsa/salsa-sync.service.js"
+  );
+  const salsaProviderIds = parseSalsaProviderIds(
+    req.query.provider,
+    req.body?.provider,
+    req.body?.salsaProviderId,
+    req.body?.salsaProviderIds,
+  );
+  const scanAll = req.body?.scanAll === true || req.query.scanAll === "1";
+  const resetCatalog = req.body?.resetCatalog === true || req.query.reset === "1";
+  if (!salsaProviderIds.length && !scanAll) {
+    res.status(400).json({
+      error: "Passe o código do provedor Salsa. Ex.: POST /admin/v1/integrations/salsa/sync?provider=46",
+    });
+    return;
+  }
   try {
     const status = startSalsaCatalogSync({
       gameListUrl: req.body?.gameListUrl,
       activateProvider: req.body?.activateProvider,
       defaultCostPct: req.body?.defaultCostPct,
+      salsaProviderIds,
+      scanAll,
+      resetCatalog,
     });
     res.json(status);
   } catch (e) {
@@ -514,6 +533,15 @@ router.post("/integrations/salsa/deactivate", async (_req, res) => {
     res.json(await deactivateSalsaCatalog());
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Deactivate failed" });
+  }
+});
+
+router.post("/integrations/salsa/reset-catalog", async (_req, res) => {
+  const { purgeImportedSalsaCatalog } = await import("../../../services/salsa/salsa-sync.service.js");
+  try {
+    res.json(await purgeImportedSalsaCatalog());
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Reset failed" });
   }
 });
 
