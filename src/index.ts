@@ -4,6 +4,8 @@ import { disconnectPrisma } from "./lib/prisma.js";
 import { startRestServer, stopRestServer } from "./gateway/rest/server.js";
 
 async function main(): Promise<void> {
+  const { ensureSchemaPatches } = await import("./lib/prisma.js");
+  await ensureSchemaPatches();
   await connectRedis();
   startRestServer();
   console.log("[App] Casino aggregator started");

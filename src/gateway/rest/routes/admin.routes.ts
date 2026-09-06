@@ -9,7 +9,16 @@ import { resolveTargetRtpForClientGame } from "../../../services/client-game-con
 
 const router = Router();
 
+router.use(async (_req, _res, next) => {
+  await ensureSchemaPatches();
+  next();
+});
+
 router.use(adminMiddleware);
+
+router.get("/session", (_req, res) => {
+  res.json({ ok: true, role: "admin" });
+});
 
 const createClientSchema = z.object({
   name: z.string().min(2),

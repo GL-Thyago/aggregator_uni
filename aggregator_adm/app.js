@@ -83,13 +83,19 @@ async function api(path, opts = {}) {
     headers: {
       "Content-Type": "application/json",
       "X-Admin-Key": state.adminKey,
+      Authorization: "Bearer " + state.adminKey,
       ...(opts.headers || {}),
     },
   });
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
-  if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = data?.error || data?.message || data?.hint || `HTTP ${res.status}`;
+    if (res.status === 403) throw new Error("Chave recusada. Use a ADMIN_API_KEY do EasyPanel, sem aspas.");
+    if (res.status === 502 || res.status === 503) throw new Error("Aggregator fora do ar (HTTP " + res.status + "). Vê os logs do EasyPanel.");
+    throw new Error(detail);
+  }
   return data;
 }
 
@@ -880,28 +886,42 @@ async function loadRtpView() {
   }
 }
 
+function showLogin(message) {
+  $("#auth-screen").classList.remove("hidden");
+  $("#app").classList.add("hidden");
+  if (message) $("#auth-error").textContent = message;
+}
+
+async function enterApp() {
+  $("#auth-screen").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  await bootstrap();
+}
+
 function initAuth() {
   $("#api-base-input").value = state.apiBase;
   if (state.adminKey) {
-    $("#auth-screen").classList.add("hidden");
-    $("#app").classList.remove("hidden");
-    bootstrap();
+    api("/session")
+      .then(() => enterApp())
+      .catch((err) => {
+        localStorage.removeItem(LS_KEY);
+        state.adminKey = "";
+        showLogin(err.message);
+      });
   }
 
   $("#auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    state.adminKey = $("#admin-key-input").value.trim();
+    state.adminKey = $("#admin-key-input").value.trim().replace(/^['"]+|['"]+$/g, "");
     state.apiBase = $("#api-base-input").value.trim() || "/admin/v1";
     $("#auth-error").textContent = "";
     try {
-      await api("/clients");
+      await api("/session");
       localStorage.setItem(LS_KEY, state.adminKey);
       localStorage.setItem(LS_BASE, state.apiBase);
-      $("#auth-screen").classList.add("hidden");
-      $("#app").classList.remove("hidden");
-      bootstrap();
+      await enterApp();
     } catch (err) {
-      $("#auth-error").textContent = err.message;
+      showLogin(err.message);
     }
   });
 

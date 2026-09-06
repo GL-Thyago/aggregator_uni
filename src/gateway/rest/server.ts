@@ -28,7 +28,12 @@ function sendIndex(dirName: string, res: express.Response) {
 export function createRestServer(): express.Application {
   const app = express();
 
-  app.use(cors());
+  app.use(
+    cors({
+      origin: true,
+      allowedHeaders: ["Content-Type", "X-Admin-Key", "Authorization", "X-Api-Key", "X-Session-Token"],
+    }),
+  );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 

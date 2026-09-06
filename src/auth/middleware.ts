@@ -60,10 +60,11 @@ export function adminMiddleware(
   res: Response,
   next: NextFunction,
 ): void {
-  const apiKey = req.headers["x-admin-key"] as string | undefined;
-
-  if (!isAdminRequest(apiKey)) {
-    res.status(403).json({ error: "Admin access required" });
+  if (!isAdminRequest(req)) {
+    res.status(403).json({
+      error: "Admin access required",
+      hint: "Confira ADMIN_API_KEY no EasyPanel (sem aspas). O header é X-Admin-Key.",
+    });
     return;
   }
   next();

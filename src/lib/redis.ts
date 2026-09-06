@@ -62,8 +62,8 @@ export async function connectRedis(): Promise<void> {
   }
 
   if (env.NODE_ENV === "production") {
-    throw new Error(
-      `[Redis] Não foi possível conectar em ${env.REDIS_URL}. ` +
+    console.error(
+      `[Redis] Indisponível (${env.REDIS_URL}) — ADM e API sobem sem cache. ` +
         `Detalhe: ${lastError?.message ?? "Connection is closed."}`,
     );
   }

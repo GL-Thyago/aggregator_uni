@@ -11,7 +11,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  ADMIN_API_KEY: z.string().min(8),
+  ADMIN_API_KEY: z
+    .string()
+    .min(8)
+    .transform((v) => v.trim().replace(/^['"]+|['"]+$/g, "")),
 
   GAMES_DIR: z.string().default("./games"),
   PUBLIC_BASE_URL: z.string().default("http://localhost:3010"),

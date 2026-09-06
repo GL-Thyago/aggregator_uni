@@ -91,6 +91,41 @@ export async function loginWithApiKey(apiKey: string) {
   };
 }
 
-export function isAdminRequest(apiKey: string | undefined): boolean {
-  return apiKey === env.ADMIN_API_KEY;
+function normalizeAdminKey(value: string | undefined | null): string {
+  return String(value ?? "").trim().replace(/^['"]+|['"]+$/g, "");
+}
+
+function headerText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
+function readAdminKeyFromRequest(req: { headers: Record<string, unknown>; query?: Record<string, unknown> }): string {
+  const header = headerText(req.headers["x-admin-key"] ?? req.headers["X-Admin-Key"]);
+  if (header.trim()) return header;
+
+  const auth = headerText(req.headers.authorization ?? req.headers.Authorization);
+  if (/^Bearer\s+/i.test(auth)) return auth.replace(/^Bearer\s+/i, "");
+
+  const queryKey = req.query?.adminKey ?? req.query?.key;
+  if (typeof queryKey === "string") return queryKey;
+
+  return "";
+}
+
+export function isAdminRequest(
+  apiKeyOrReq: string | undefined | { headers: Record<string, unknown>; query?: Record<string, unknown> },
+): boolean {
+  const given = normalizeAdminKey(
+    typeof apiKeyOrReq === "string" || apiKeyOrReq === undefined
+      ? apiKeyOrReq
+      : readAdminKeyFromRequest(apiKeyOrReq),
+  );
+  const expected = normalizeAdminKey(env.ADMIN_API_KEY);
+  if (!given || !expected) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
