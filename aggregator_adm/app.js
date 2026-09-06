@@ -494,7 +494,7 @@ async function loadRevenueView() {
           <td class="num ${c.salsaDue < 0 ? "bad" : ""}">${money(c.salsaDue)}</td>
           <td class="num ${c.yourEarn < 0 ? "bad" : "ok"}">${money(c.yourEarn)}</td>
         </tr>`).join("")}
-      </tbody></table>` : "<p class='hint'>Sem movimento no período.</p>";
+      </tbody></table>` : "<p class='hint'>Sem movimento no período.</p>");
 
     $$(".link-billing-client").forEach((btn) => btn.addEventListener("click", () => {
       $("#client-filter").value = btn.dataset.id;
@@ -519,7 +519,7 @@ async function loadRevenueView() {
           <td class="num ${p.chargeAmount < 0 ? "bad" : ""}">${money(p.chargeAmount)}</td>
           <td class="num ${p.yourEarn < 0 ? "bad" : "ok"}">${money(p.yourEarn)}</td>
         </tr>`).join("")}
-      </tbody></table>` : "<p class='hint'>Sem dados por provedor.</p>";
+      </tbody></table>` : "<p class='hint'>Sem dados por provedor.</p>");
 
     await loadBillingSpins(1);
   } catch (e) {
@@ -546,7 +546,7 @@ async function loadBillingSpins(page = 1) {
         <td class="num">${s.salsaPct}%</td>
         <td class="num">${s.chargePct}%</td>
       </tr>`).join("")}
-    </tbody></table>` : "<p class='hint'>Sem jogadas neste período.</p>";
+    </tbody></table>` : "<p class='hint'>Sem jogadas neste período.</p>");
 
   const from = data.total ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = Math.min(data.page * data.pageSize, data.total);
@@ -555,7 +555,7 @@ async function loadBillingSpins(page = 1) {
     <button type="button" class="ghost" id="billing-prev" ${data.page <= 1 ? "disabled" : ""}>Anterior</button>
     <span>Pág. ${data.page} / ${data.pages}</span>
     <button type="button" class="ghost" id="billing-next" ${data.page >= data.pages ? "disabled" : ""}>Próxima</button>
-  `;
+  `);
   $("#billing-prev")?.addEventListener("click", () => loadBillingSpins(data.page - 1));
   $("#billing-next")?.addEventListener("click", () => loadBillingSpins(data.page + 1));
 }
