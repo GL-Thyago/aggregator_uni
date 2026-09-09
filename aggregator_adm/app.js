@@ -421,7 +421,7 @@ async function renderPartnerAccess(clientId) {
   chargeInput.placeholder = String(data.defaults.operatorChargePct);
   chargeInput.value = data.client.chargePct ?? "";
   $("#partner-charge-hint").textContent =
-    `Vazio aqui = cobra ${data.defaults.operatorChargePct}% em todos. Na tabela podes pôr 15 no PG e 18 no Spribe. A % Salsa de cada provedor edita-se em Integrações.`;
+    `Vazio na cobrança = ${data.defaults.operatorChargePct}% (padrão). % Salsa vazia = % do provedor em Integrações. Luck pode ter Salsa diferente dos outros sócios.`;
 
   $("#partner-providers-table").innerHTML = `<table>
     <thead><tr>
@@ -431,7 +431,7 @@ async function renderPartnerAccess(clientId) {
       <tr data-provider-id="${p.providerId}">
         <td><input type="checkbox" class="partner-enabled" ${p.isEnabled ? "checked" : ""}></td>
         <td><strong>${p.name}</strong><br><small>${p.sourceName && p.sourceName !== p.name ? p.sourceName + " · " : ""}${p.slug}</small></td>
-        <td class="num">${p.salsaPct}%</td>
+        <td><input class="rate-input partner-salsa" type="number" step="0.1" min="0" max="50" value="${p.salsaFeePct ?? ""}" placeholder="${p.salsaDefaultPct}"></td>
         <td><input class="rate-input partner-charge" type="number" step="0.1" min="0" max="50" value="${p.chargePct ?? ""}" placeholder="${data.client.resolvedChargePct}"></td>
         <td class="num ok">${p.yourMarginPct}%</td>
         <td class="num">${p.activeGameCount}/${p.gameCount}</td>
@@ -443,11 +443,13 @@ async function renderPartnerAccess(clientId) {
 
 function readPartnerAccessFromTable() {
   return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => {
-    const raw = tr.querySelector(".partner-charge")?.value;
+    const rawCharge = tr.querySelector(".partner-charge")?.value;
+    const rawSalsa = tr.querySelector(".partner-salsa")?.value;
     return {
       providerId: Number(tr.dataset.providerId),
       isEnabled: tr.querySelector(".partner-enabled").checked,
-      chargePct: raw === "" || raw == null ? null : Number(raw),
+      chargePct: rawCharge === "" || rawCharge == null ? null : Number(rawCharge),
+      feePct: rawSalsa === "" || rawSalsa == null ? null : Number(rawSalsa),
     };
   });
 }

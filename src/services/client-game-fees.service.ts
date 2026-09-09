@@ -11,8 +11,8 @@ export interface ResolvedClientGameFees {
 }
 
 /**
- * % Salsa: override sócio+provedor → % do provedor → padrão global → % do jogo.
- * Cobrança: override sócio+provedor → cobrança do sócio → padrão global.
+ * % Salsa: jogo (cliente) → sócio+provedor → % do provedor → padrão global.
+ * Cobrança: jogo (cliente) → sócio+provedor → cobrança do sócio → padrão global.
  */
 export async function resolveClientGameFees(input: {
   clientId: string;
@@ -22,7 +22,7 @@ export async function resolveClientGameFees(input: {
   defaultProviderCostPct: number;
   defaultClientMarginPct: number;
 }): Promise<ResolvedClientGameFees> {
-  const [cfg, client, provider, access] = await Promise.all([
+  const [cfg, client, provider, access, gameEnt] = await Promise.all([
     getSalsaRuntimeConfig(),
     prisma.client.findUnique({
       where: { id: input.clientId },
@@ -40,18 +40,24 @@ export async function resolveClientGameFees(input: {
           select: { feePct: true, chargePct: true },
         })
       : Promise.resolve(null),
+    prisma.clientEntitlement.findFirst({
+      where: { clientId: input.clientId, gameId: input.gameId },
+      select: { feePct: true, chargePct: true },
+    }),
   ]);
 
   const globalSalsa = Number(cfg.defaultProviderCostPct) || input.defaultProviderCostPct;
   const providerSalsa = provider?.defaultCostPct != null ? Number(provider.defaultCostPct) : null;
   const accessSalsa = access?.feePct != null ? Number(access.feePct) : null;
-  const providerCostPct = accessSalsa ?? providerSalsa ?? globalSalsa;
+  const gameSalsa = gameEnt?.feePct != null ? Number(gameEnt.feePct) : null;
+  const providerCostPct = gameSalsa ?? accessSalsa ?? providerSalsa ?? globalSalsa;
 
   const globalCharge =
     Number(cfg.defaultOperatorChargePct) || roundPct(providerCostPct + input.defaultClientMarginPct);
   const clientCharge = client?.chargePct != null ? Number(client.chargePct) : null;
   const accessCharge = access?.chargePct != null ? Number(access.chargePct) : null;
-  const totalChargePct = accessCharge ?? clientCharge ?? globalCharge;
+  const gameCharge = gameEnt?.chargePct != null ? Number(gameEnt.chargePct) : null;
+  const totalChargePct = gameCharge ?? accessCharge ?? clientCharge ?? globalCharge;
   const clientMarginPct = Math.max(0, roundPct(totalChargePct - providerCostPct));
 
   return {
@@ -60,7 +66,7 @@ export async function resolveClientGameFees(input: {
     totalChargePct,
     gameFeePct: providerCostPct,
     clientFeePct: clientMarginPct,
-    chargePctOverride: accessCharge ?? clientCharge,
+    chargePctOverride: gameCharge ?? accessCharge ?? clientCharge,
   };
 }
 

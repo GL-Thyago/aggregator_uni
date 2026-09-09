@@ -622,6 +622,7 @@ router.put("/clients/:id/partner-access", async (req, res) => {
             providerId: z.number().int(),
             isEnabled: z.boolean(),
             chargePct: z.number().min(0).max(50).nullable().optional(),
+            feePct: z.number().min(0).max(50).nullable().optional(),
           }),
         )
         .min(1),

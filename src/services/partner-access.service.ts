@@ -58,7 +58,9 @@ export async function getPartnerProviderAccess(clientId: string) {
     },
     providers: providers.map((p) => {
       const row = accessById.get(p.id);
-      const salsa = p.defaultCostPct != null ? Number(p.defaultCostPct) : salsaPct;
+      const providerSalsa = p.defaultCostPct != null ? Number(p.defaultCostPct) : salsaPct;
+      const salsaOverride = row?.feePct != null ? Number(row.feePct) : null;
+      const salsa = salsaOverride ?? providerSalsa;
       const charge = row?.chargePct != null ? Number(row.chargePct) : null;
       const resolvedCharge = charge ?? resolvedChargePct;
       return {
@@ -67,6 +69,8 @@ export async function getPartnerProviderAccess(clientId: string) {
         name: p.displayName?.trim() || p.name,
         sourceName: p.name,
         salsaPct: salsa,
+        salsaDefaultPct: providerSalsa,
+        salsaFeePct: salsaOverride,
         chargePct: charge,
         resolvedChargePct: resolvedCharge,
         yourMarginPct: Math.max(0, Math.round((resolvedCharge - salsa) * 10) / 10),
@@ -87,6 +91,7 @@ export async function savePartnerProviderAccess(
       providerId: number;
       isEnabled: boolean;
       chargePct?: number | null;
+      feePct?: number | null;
     }>;
   },
 ) {
@@ -115,10 +120,12 @@ export async function savePartnerProviderAccess(
         providerId: item.providerId,
         isEnabled: Boolean(item.isEnabled),
         chargePct: item.chargePct ?? null,
+        feePct: item.feePct ?? null,
       },
       update: {
         isEnabled: Boolean(item.isEnabled),
         ...(item.chargePct !== undefined ? { chargePct: item.chargePct } : {}),
+        ...(item.feePct !== undefined ? { feePct: item.feePct } : {}),
       },
     });
   }
