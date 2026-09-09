@@ -22,7 +22,7 @@ router.get("/session", (_req, res) => {
 
 const createClientSchema = z.object({
   name: z.string().min(2),
-  marginPct: z.number().min(0).max(50).default(0),
+  marginPct: z.number().min(0).max(50).default(5),
   chargePct: z.number().min(0).max(50).nullable().optional(),
   billingMode: z.enum(["PREPAID", "POSTPAID"]).default("PREPAID"),
   maxCredit: z.number().min(0).nullable().optional(),
@@ -615,7 +615,9 @@ router.get("/clients/:id/partner-access", async (req, res) => {
 router.put("/clients/:id/partner-access", async (req, res) => {
   const parsed = z
     .object({
+      marginPct: z.number().min(0).max(50).optional(),
       chargePct: z.number().min(0).max(50).nullable().optional(),
+      clearGameChargeOverrides: z.boolean().optional(),
       providers: z
         .array(
           z.object({
@@ -636,7 +638,9 @@ router.put("/clients/:id/partner-access", async (req, res) => {
     const { savePartnerProviderAccess } = await import("../../../services/partner-access.service.js");
     res.json(
       await savePartnerProviderAccess(req.params.id!, {
+        marginPct: parsed.data.marginPct,
         chargePct: parsed.data.chargePct,
+        clearGameChargeOverrides: parsed.data.clearGameChargeOverrides,
         providers: parsed.data.providers,
       }),
     );
@@ -854,9 +858,9 @@ router.put("/clients/:id/game-fees", async (req, res) => {
     const data = {
       categoryId: game.categoryId,
       isEnabled: true,
-      feePct: item.providerCostPct ?? existing?.feePct ?? null,
-      chargePct: item.chargePct ?? existing?.chargePct ?? null,
-      rtpPct: item.rtpPct ?? existing?.rtpPct ?? null,
+      feePct: item.providerCostPct !== undefined ? item.providerCostPct : existing?.feePct ?? null,
+      chargePct: item.chargePct !== undefined ? item.chargePct : existing?.chargePct ?? null,
+      rtpPct: item.rtpPct !== undefined ? item.rtpPct : existing?.rtpPct ?? null,
     };
 
     if (existing) {

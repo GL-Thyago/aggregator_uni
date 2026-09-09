@@ -2,6 +2,10 @@ import { prisma } from "../lib/prisma.js";
 import { refreshClientEntitlements } from "../entitlements/entitlement.service.js";
 import { getSalsaRuntimeConfig } from "./salsa/salsa-config.service.js";
 
+function roundPct(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 export async function getPartnerProviderAccess(clientId: string) {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
@@ -11,9 +15,13 @@ export async function getPartnerProviderAccess(clientId: string) {
 
   const cfg = await getSalsaRuntimeConfig();
   const salsaPct = Number(cfg.defaultProviderCostPct);
-  const defaultChargePct = Number(cfg.defaultOperatorChargePct);
+  const defaultMarginPct = roundPct(
+    Number.isFinite(Number(cfg.defaultOperatorChargePct) - salsaPct)
+      ? Math.max(0, Number(cfg.defaultOperatorChargePct) - salsaPct)
+      : 5,
+  );
+  const clientMarginPct = client.marginPct != null ? Number(client.marginPct) : defaultMarginPct;
   const clientChargePct = client.chargePct != null ? Number(client.chargePct) : null;
-  const resolvedChargePct = clientChargePct ?? defaultChargePct;
 
   const providers = await prisma.gameProvider.findMany({
     where: { integration: "SALSA" },
@@ -47,14 +55,15 @@ export async function getPartnerProviderAccess(clientId: string) {
   return {
     defaults: {
       salsaPct,
-      operatorChargePct: defaultChargePct,
+      operatorMarginPct: defaultMarginPct,
+      operatorChargePct: Number(cfg.defaultOperatorChargePct),
     },
     client: {
       ...client,
-      marginPct: Number(client.marginPct),
+      marginPct: clientMarginPct,
       chargePct: clientChargePct,
-      resolvedChargePct,
-      yourMarginPct: Math.max(0, Math.round((resolvedChargePct - salsaPct) * 10) / 10),
+      resolvedChargePct: clientChargePct,
+      yourMarginPct: clientMarginPct,
     },
     providers: providers.map((p) => {
       const row = accessById.get(p.id);
@@ -62,7 +71,8 @@ export async function getPartnerProviderAccess(clientId: string) {
       const salsaOverride = row?.feePct != null ? Number(row.feePct) : null;
       const salsa = salsaOverride ?? providerSalsa;
       const charge = row?.chargePct != null ? Number(row.chargePct) : null;
-      const resolvedCharge = charge ?? resolvedChargePct;
+      const resolvedCharge = charge ?? (clientChargePct != null ? clientChargePct : roundPct(salsa + clientMarginPct));
+      const rowMargin = charge != null ? Math.max(0, roundPct(charge - salsa)) : clientMarginPct;
       return {
         providerId: p.id,
         slug: p.slug,
@@ -72,8 +82,9 @@ export async function getPartnerProviderAccess(clientId: string) {
         salsaDefaultPct: providerSalsa,
         salsaFeePct: salsaOverride,
         chargePct: charge,
+        marginPct: charge != null ? rowMargin : null,
         resolvedChargePct: resolvedCharge,
-        yourMarginPct: Math.max(0, Math.round((resolvedCharge - salsa) * 10) / 10),
+        yourMarginPct: rowMargin,
         isActiveGlobal: p.isActive,
         gameCount: totalById.get(p.id) ?? 0,
         activeGameCount: activeById.get(p.id) ?? 0,
@@ -86,7 +97,9 @@ export async function getPartnerProviderAccess(clientId: string) {
 export async function savePartnerProviderAccess(
   clientId: string,
   input: {
+    marginPct?: number;
     chargePct?: number | null;
+    clearGameChargeOverrides?: boolean;
     providers: Array<{
       providerId: number;
       isEnabled: boolean;
@@ -98,16 +111,21 @@ export async function savePartnerProviderAccess(
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
   if (!client) throw new Error("Client not found");
 
-  if (input.chargePct !== undefined) {
-    const cfg = await getSalsaRuntimeConfig();
-    const salsaPct = Number(cfg.defaultProviderCostPct);
-    const chargePct = input.chargePct;
+  if (input.marginPct !== undefined || input.chargePct !== undefined) {
     await prisma.client.update({
       where: { id: clientId },
       data: {
-        chargePct,
-        ...(chargePct != null ? { marginPct: Math.max(0, chargePct - salsaPct) } : {}),
+        ...(input.marginPct !== undefined && { marginPct: input.marginPct }),
+        ...(input.chargePct !== undefined && { chargePct: input.chargePct }),
+        ...(input.marginPct !== undefined && { chargePct: null }),
       },
+    });
+  }
+
+  if (input.clearGameChargeOverrides) {
+    await prisma.clientEntitlement.updateMany({
+      where: { clientId },
+      data: { chargePct: null },
     });
   }
 

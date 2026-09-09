@@ -30,31 +30,48 @@ export function settleGgr(ggr: number, salsaPct: number, chargePct: number) {
 
 type RateMaps = {
   globalSalsa: number;
-  globalCharge: number;
   providerSalsa: Map<number, number>;
+  gameSalsa: Map<number, number>;
+  clientMargin: Map<string, number>;
   clientCharge: Map<string, number>;
   accessCharge: Map<string, number>;
   accessSalsa: Map<string, number>;
+  entitlementSalsa: Map<string, number>;
+  entitlementCharge: Map<string, number>;
 };
 
+function roundPct(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 async function loadRateMaps(): Promise<RateMaps> {
-  const [cfg, providers, clients, access] = await Promise.all([
+  const [cfg, providers, clients, access, games, entitlements] = await Promise.all([
     getSalsaRuntimeConfig(),
     prisma.gameProvider.findMany({ select: { id: true, defaultCostPct: true } }),
-    prisma.client.findMany({ select: { id: true, chargePct: true } }),
+    prisma.client.findMany({ select: { id: true, chargePct: true, marginPct: true } }),
     prisma.clientProviderAccess.findMany({
       select: { clientId: true, providerId: true, feePct: true, chargePct: true },
+    }),
+    prisma.game.findMany({ select: { id: true, aggregatorFeePct: true } }),
+    prisma.clientEntitlement.findMany({
+      where: { gameId: { not: null } },
+      select: { clientId: true, gameId: true, feePct: true, chargePct: true },
     }),
   ]);
 
   const globalSalsa = Number(cfg.defaultProviderCostPct) || 0;
-  const globalCharge = Number(cfg.defaultOperatorChargePct) || 0;
   const providerSalsa = new Map<number, number>();
   for (const p of providers) {
     if (p.defaultCostPct != null) providerSalsa.set(p.id, Number(p.defaultCostPct));
   }
+  const gameSalsa = new Map<number, number>();
+  for (const g of games) {
+    if (g.aggregatorFeePct != null) gameSalsa.set(g.id, Number(g.aggregatorFeePct));
+  }
+  const clientMargin = new Map<string, number>();
   const clientCharge = new Map<string, number>();
   for (const c of clients) {
+    clientMargin.set(c.id, Number(c.marginPct) || 0);
     if (c.chargePct != null) clientCharge.set(c.id, Number(c.chargePct));
   }
   const accessCharge = new Map<string, number>();
@@ -64,14 +81,42 @@ async function loadRateMaps(): Promise<RateMaps> {
     if (row.chargePct != null) accessCharge.set(key, Number(row.chargePct));
     if (row.feePct != null) accessSalsa.set(key, Number(row.feePct));
   }
+  const entitlementSalsa = new Map<string, number>();
+  const entitlementCharge = new Map<string, number>();
+  for (const row of entitlements) {
+    if (row.gameId == null) continue;
+    const key = `${row.clientId}:${row.gameId}`;
+    if (row.feePct != null) entitlementSalsa.set(key, Number(row.feePct));
+    if (row.chargePct != null) entitlementCharge.set(key, Number(row.chargePct));
+  }
 
-  return { globalSalsa, globalCharge, providerSalsa, clientCharge, accessCharge, accessSalsa };
+  return {
+    globalSalsa,
+    providerSalsa,
+    gameSalsa,
+    clientMargin,
+    clientCharge,
+    accessCharge,
+    accessSalsa,
+    entitlementSalsa,
+    entitlementCharge,
+  };
 }
 
-function resolveRates(maps: RateMaps, clientId: string, providerId: number) {
-  const key = `${clientId}:${providerId}`;
-  const salsaPct = maps.accessSalsa.get(key) ?? maps.providerSalsa.get(providerId) ?? maps.globalSalsa;
-  const chargePct = maps.accessCharge.get(key) ?? maps.clientCharge.get(clientId) ?? maps.globalCharge;
+function resolveRates(maps: RateMaps, clientId: string, providerId: number, gameId?: number) {
+  const accessKey = `${clientId}:${providerId}`;
+  const gameKey = gameId != null ? `${clientId}:${gameId}` : "";
+  const salsaPct =
+    (gameKey ? maps.entitlementSalsa.get(gameKey) : undefined) ??
+    maps.accessSalsa.get(accessKey) ??
+    (gameId != null ? maps.gameSalsa.get(gameId) : undefined) ??
+    maps.providerSalsa.get(providerId) ??
+    maps.globalSalsa;
+  const chargePct =
+    (gameKey ? maps.entitlementCharge.get(gameKey) : undefined) ??
+    maps.accessCharge.get(accessKey) ??
+    maps.clientCharge.get(clientId) ??
+    roundPct(salsaPct + (maps.clientMargin.get(clientId) ?? 0));
   return { salsaPct, chargePct };
 }
 
@@ -157,6 +202,8 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
       winAmount: number;
       salsaPct: number;
       chargePct: number;
+      salsaDue: number;
+      chargeAmount: number;
     }
   >();
 
@@ -179,7 +226,8 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
     client.winAmount += s.winAmount;
     byClient.set(s.clientId, client);
 
-    const rates = resolveRates(maps, s.clientId, s.providerId);
+    const rates = resolveRates(maps, s.clientId, s.providerId, s.gameId);
+    const settled = settleGgr(s.betAmount - s.winAmount, rates.salsaPct, rates.chargePct);
     const pk = `${s.clientId}:${s.providerId}`;
     const prov = byProvider.get(pk) ?? {
       clientId: s.clientId,
@@ -192,21 +240,32 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
       winAmount: 0,
       salsaPct: rates.salsaPct,
       chargePct: rates.chargePct,
+      salsaDue: 0,
+      chargeAmount: 0,
     };
     prov.spins += 1;
     prov.betAmount += s.betAmount;
     prov.winAmount += s.winAmount;
+    prov.salsaDue += settled.salsaDue;
+    prov.chargeAmount += settled.chargeAmount;
     byProvider.set(pk, prov);
   }
 
   const providerRows = [...byProvider.values()].map((row) => {
-    const ggr = row.betAmount - row.winAmount;
-    const settled = settleGgr(ggr, row.salsaPct, row.chargePct);
+    const ggr = round2(row.betAmount - row.winAmount);
+    const chargeAmount = round2(row.chargeAmount);
+    const salsaDue = round2(row.salsaDue);
     return {
       ...row,
       betAmount: round2(row.betAmount),
       winAmount: round2(row.winAmount),
-      ...settled,
+      ggr,
+      billableGgr: ggr,
+      salsaPct: row.salsaPct,
+      chargePct: row.chargePct,
+      chargeAmount,
+      salsaDue,
+      yourEarn: round2(chargeAmount - salsaDue),
     };
   });
 
@@ -288,6 +347,7 @@ export async function getBillingSpins(options: {
             client: { select: { name: true } },
             game: {
               select: {
+                id: true,
                 name: true,
                 slug: true,
                 provider: { select: { id: true, name: true, displayName: true, slug: true } },
@@ -309,7 +369,7 @@ export async function getBillingSpins(options: {
     pages: Math.max(1, Math.ceil(total / pageSize)),
     spins: rows.map((s) => {
       const providerId = s.session.game.provider.id;
-      const rates = resolveRates(maps, s.session.clientId, providerId);
+      const rates = resolveRates(maps, s.session.clientId, providerId, s.session.game.id);
       const bet = Number(s.betAmount);
       const win = Number(s.winAmount);
       const ggr = bet - win;
@@ -324,9 +384,6 @@ export async function getBillingSpins(options: {
         providerId,
         betAmount: round2(bet),
         winAmount: round2(win),
-        ggr: round2(ggr),
-        salsaPct: rates.salsaPct,
-        chargePct: rates.chargePct,
         ...settleGgr(ggr, rates.salsaPct, rates.chargePct),
       };
     }),

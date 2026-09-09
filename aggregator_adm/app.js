@@ -22,6 +22,10 @@ function money(v) {
   return "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function roundPct(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
 function sinceDate() {
   const days = Number($("#period-select").value || 30);
   const d = new Date();
@@ -228,14 +232,14 @@ async function loadDashboard() {
 function renderClientsTable() {
   $("#clients-table").innerHTML = `<table>
     <thead><tr>
-      <th>Nome</th><th>Ambiente</th><th>Cobrança</th><th>Cobrança %</th><th>Saldo B2B</th><th>Status</th><th></th>
+      <th>Nome</th><th>Ambiente</th><th>Cobrança</th><th>Margem %</th><th>Saldo B2B</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>${state.clients.map((c) => `
       <tr>
         <td>${c.name}</td>
         <td>${c.launchEnvironment === "LIVE" ? "Produção" : "Teste"}</td>
         <td><span class="badge ${c.billingMode === "POSTPAID" ? "postpaid" : "prepaid"}">${c.billingMode === "POSTPAID" ? "Pós-pago" : "Pré-pago"}${c.maxCredit ? ` · limite ${money(c.maxCredit)}` : ""}</span></td>
-        <td class="num">${c.chargePct != null ? Number(c.chargePct) + "%" : "padrão"}</td>
+        <td class="num">${Number(c.marginPct ?? 0)}%</td>
         <td class="num">${money(c.clientWallet?.balance ?? 0)}</td>
         <td class="${c.isActive ? "ok" : "bad"}">${c.isActive ? "Ativo" : "Inativo"}</td>
         <td><button class="ghost btn-open-client" data-id="${c.id}">Gerenciar</button></td>
@@ -311,40 +315,44 @@ async function refreshClientDetail() {
     { label: "Saldo B2B", value: money(wallet.balance), cls: wallet.balance < 0 ? "bad" : "ok" },
     { label: "Cobrança", value: wallet.client.billingMode === "POSTPAID" ? "Pós-pago" : "Pré-pago" },
     { label: "Crédito disponível", value: money(wallet.availableCredit) },
-    { label: "Cobrança B2B", value: client.chargePct != null ? Number(client.chargePct) + "%" : "padrão global" },
+    { label: "Margem do agregador", value: Number(client.marginPct ?? 0) + "%" },
   ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
 
   const enabledGames = games.filter((g) =>
     client.entitlements.some((e) => e.isEnabled && (e.gameId === g.id || (e.gameId == null && e.categoryId === g.categoryId))),
   );
 
+  const defaultMargin = Number(client.marginPct ?? 0);
+  const syncGameRateRow = (tr) => {
+    const salsa = Number(tr.querySelector(".repasse-pct").value || tr.querySelector(".repasse-pct").placeholder);
+    const marginVal = tr.querySelector(".margin-pct").value;
+    const margin = marginVal !== "" ? Number(marginVal) : defaultMargin;
+    tr.querySelector(".charge-preview").textContent = roundPct(salsa + margin).toFixed(1) + "%";
+  };
+
   $("#client-game-rates-table").innerHTML = `<table>
-    <thead><tr><th>Jogo</th><th>Repasse Salsa %</th><th>Cobrança total %</th><th>Sua margem</th><th>RTP cliente %</th></tr></thead>
+    <thead><tr><th>Jogo</th><th>Repasse Salsa %</th><th>Margem %</th><th>Cobrança total</th><th>RTP cliente %</th></tr></thead>
     <tbody>${enabledGames.map((g) => {
       const ent = client.entitlements.find((e) => e.gameId === g.id) ||
         client.entitlements.find((e) => e.gameId == null && e.categoryId === g.categoryId);
-      const repasse = ent?.feePct != null ? Number(ent.feePct) : Number(g.aggregatorFeePct);
-      const chargeDefault = repasse + Number(client.marginPct);
-      const charge = ent?.chargePct != null ? Number(ent.chargePct) : "";
-      const margin = charge !== "" ? Math.max(0, Number(charge) - repasse) : Number(client.marginPct);
+      const salsa = ent?.feePct != null ? Number(ent.feePct) : Number(g.aggregatorFeePct);
+      const storedCharge = ent?.chargePct != null ? Number(ent.chargePct) : null;
+      const inheritedCharge = roundPct(salsa + defaultMargin);
+      const isOverride = storedCharge != null && Math.abs(storedCharge - inheritedCharge) > 0.001;
+      const marginValue = isOverride ? roundPct(Math.max(0, storedCharge - salsa)) : "";
+      const chargePreview = isOverride ? storedCharge : inheritedCharge;
       return `<tr data-game-id="${g.id}" data-category-id="${g.categoryId}">
         <td>${g.name}</td>
         <td><input class="rate-input repasse-pct" type="number" step="0.1" value="${ent?.feePct ?? ""}" placeholder="${Number(g.aggregatorFeePct)}"></td>
-        <td><input class="rate-input charge-pct" type="number" step="0.1" value="${charge}" placeholder="${chargeDefault}"></td>
-        <td class="num margin-preview">${margin.toFixed(1)}%</td>
+        <td><input class="rate-input margin-pct" type="number" step="0.1" min="0" max="50" value="${marginValue}" placeholder="${defaultMargin}"></td>
+        <td class="num charge-preview">${Number(chargePreview).toFixed(1)}%</td>
         <td><input class="rate-input rtp-pct" type="number" step="0.1" value="${ent?.rtpPct ?? ""}" placeholder="${g.rtp ?? 80}"></td>
       </tr>`;
     }).join("")}
     </tbody></table>`;
 
-  $$("#client-game-rates-table .charge-pct, #client-game-rates-table .repasse-pct").forEach((input) => {
-    input.addEventListener("input", () => {
-      const tr = input.closest("tr");
-      const repasse = Number(tr.querySelector(".repasse-pct").value || tr.querySelector(".repasse-pct").placeholder);
-      const chargeVal = tr.querySelector(".charge-pct").value;
-      const charge = chargeVal !== "" ? Number(chargeVal) : Number(tr.querySelector(".charge-pct").placeholder);
-      tr.querySelector(".margin-preview").textContent = Math.max(0, charge - repasse).toFixed(1) + "%";
-    });
+  $$("#client-game-rates-table .margin-pct, #client-game-rates-table .repasse-pct").forEach((input) => {
+    input.addEventListener("input", () => syncGameRateRow(input.closest("tr")));
   });
 
   $("#client-wallet-txs").innerHTML = wallet.transactions.length ? `<table>
@@ -365,7 +373,7 @@ async function refreshClientDetail() {
     $("#client-form-title").textContent = "Editar: " + client.name;
     const form = $("#client-form");
     form.name.value = client.name;
-    form.chargePct.value = client.chargePct ?? "";
+    form.marginPct.value = client.marginPct ?? 5;
     form.billingMode.value = client.billingMode || "PREPAID";
     form.maxCredit.value = client.maxCredit ?? "";
     form.initialBalance.value = 0;
@@ -408,48 +416,61 @@ async function renderPartnerAccess(clientId) {
   $("#partner-summary").innerHTML = [
     { label: "Sócio", value: data.client.name },
     { label: "% Salsa (todos)", value: data.defaults.salsaPct + "%" },
-    { label: "Cobrança padrão", value: data.defaults.operatorChargePct + "%" },
-    { label: "Cobrança deste sócio", value: data.client.resolvedChargePct + "%", cls: data.client.chargePct != null ? "ok" : "" },
-    { label: "Sua margem", value: data.client.yourMarginPct + "%" },
+    { label: "Margem deste sócio", value: data.client.yourMarginPct + "%", cls: "ok" },
     { label: "Provedores liberados", value: enabled, cls: enabled ? "ok" : "warn" },
     { label: "Já no ar", value: live, cls: live ? "ok" : "warn" },
   ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join("");
 
   const chargeBox = $("#partner-charge-box");
   chargeBox?.classList.remove("hidden");
-  const chargeInput = $("#partner-charge-override");
-  chargeInput.placeholder = String(data.defaults.operatorChargePct);
-  chargeInput.value = data.client.chargePct ?? "";
+  const marginInput = $("#partner-margin-override");
+  marginInput.placeholder = String(data.defaults.operatorMarginPct ?? 5);
+  marginInput.value = data.client.marginPct ?? 5;
   $("#partner-charge-hint").textContent =
-    `Vazio na cobrança = ${data.defaults.operatorChargePct}% (padrão). % Salsa vazia = % do provedor em Integrações. Luck pode ter Salsa diferente dos outros sócios.`;
+    `Cobrança = Salsa do jogo/provedor + esta margem. 0 = Luck (só a Salsa). 5 = padrão. Vazio na linha do provedor = usa esta margem.`;
 
   $("#partner-providers-table").innerHTML = `<table>
     <thead><tr>
-      <th>Liberar</th><th>Provedor</th><th>% Salsa</th><th>Cobrança deste sócio</th><th>Tua margem</th><th>Jogos</th>
+      <th>Liberar</th><th>Provedor</th><th>% Salsa</th><th>Margem %</th><th>Cobrança</th><th>Jogos</th>
     </tr></thead>
     <tbody>${data.providers.map((p) => `
       <tr data-provider-id="${p.providerId}">
         <td><input type="checkbox" class="partner-enabled" ${p.isEnabled ? "checked" : ""}></td>
         <td><strong>${p.name}</strong><br><small>${p.sourceName && p.sourceName !== p.name ? p.sourceName + " · " : ""}${p.slug}</small></td>
         <td><input class="rate-input partner-salsa" type="number" step="0.1" min="0" max="50" value="${p.salsaFeePct ?? ""}" placeholder="${p.salsaDefaultPct}"></td>
-        <td><input class="rate-input partner-charge" type="number" step="0.1" min="0" max="50" value="${p.chargePct ?? ""}" placeholder="${data.client.resolvedChargePct}"></td>
-        <td class="num ok">${p.yourMarginPct}%</td>
+        <td><input class="rate-input partner-margin" type="number" step="0.1" min="0" max="50" value="${p.marginPct ?? ""}" placeholder="${data.client.yourMarginPct}"></td>
+        <td class="num partner-charge-preview">${Number(p.resolvedChargePct).toFixed(1)}%</td>
         <td class="num">${p.activeGameCount}/${p.gameCount}</td>
       </tr>`).join("")}
     </tbody></table>`;
+
+  const syncPartnerRow = (tr) => {
+    const salsa = Number(tr.querySelector(".partner-salsa").value || tr.querySelector(".partner-salsa").placeholder);
+    const marginVal = tr.querySelector(".partner-margin").value;
+    const margin = marginVal !== "" ? Number(marginVal) : Number($("#partner-margin-override").value || 0);
+    tr.querySelector(".partner-charge-preview").textContent = roundPct(salsa + margin).toFixed(1) + "%";
+  };
+  $$("#partner-providers-table .partner-salsa, #partner-providers-table .partner-margin").forEach((input) => {
+    input.addEventListener("input", () => syncPartnerRow(input.closest("tr")));
+  });
+  $("#partner-margin-override")?.addEventListener("input", () => {
+    $$("#partner-providers-table tbody tr").forEach(syncPartnerRow);
+  });
 
   $("#btn-save-partner-access").disabled = false;
 }
 
 function readPartnerAccessFromTable() {
   return [...$("#partner-providers-table").querySelectorAll("tbody tr")].map((tr) => {
-    const rawCharge = tr.querySelector(".partner-charge")?.value;
     const rawSalsa = tr.querySelector(".partner-salsa")?.value;
+    const rawMargin = tr.querySelector(".partner-margin")?.value;
+    const salsa = Number(rawSalsa === "" || rawSalsa == null ? tr.querySelector(".partner-salsa").placeholder : rawSalsa);
+    const marginIsOverride = rawMargin !== "" && rawMargin != null;
     return {
       providerId: Number(tr.dataset.providerId),
       isEnabled: tr.querySelector(".partner-enabled").checked,
-      chargePct: rawCharge === "" || rawCharge == null ? null : Number(rawCharge),
       feePct: rawSalsa === "" || rawSalsa == null ? null : Number(rawSalsa),
+      chargePct: marginIsOverride ? roundPct(salsa + Number(rawMargin)) : null,
     };
   });
 }
@@ -699,7 +720,7 @@ async function loadIntegrationsView() {
       { label: "Jogos importados", value: salsa.gamesImported },
       { label: "Jogos ativos", value: salsa.gamesActive ?? "—", cls: salsa.gamesActive ? "ok" : "warn" },
       { label: "% Salsa", value: (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct) + "%" },
-      { label: "% operador", value: (salsaCfg?.defaultOperatorChargePct ?? "—") + "%" },
+      { label: "Margem padrão", value: roundPct((salsaCfg?.defaultOperatorChargePct ?? 20) - (salsaCfg?.defaultProviderCostPct ?? salsa.defaultCostPct ?? 0)) + "%" },
     ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join(""));
 
     if (salsaCfg) {
@@ -710,7 +731,10 @@ async function loadIntegrationsView() {
       setNamedField(form, "apiBase", salsaCfg.apiBase || "");
       const commissions = $("#commission-defaults-form");
       setNamedField(commissions, "defaultProviderCostPct", salsaCfg.defaultProviderCostPct ?? 6.5);
-      setNamedField(commissions, "defaultOperatorChargePct", salsaCfg.defaultOperatorChargePct ?? 20);
+      const salsaPct = Number(salsaCfg.defaultProviderCostPct ?? 6.5);
+      const chargePct = Number(salsaCfg.defaultOperatorChargePct ?? salsaPct + 5);
+      setNamedField(commissions, "defaultOperatorMarginPct", roundPct(Math.max(0, chargePct - salsaPct)));
+      setNamedField(commissions, "defaultOperatorChargePct", chargePct);
     }
 
     $("#salsa-config-pre").textContent = `# Publisher (único, a Salsa chama isto):
@@ -971,7 +995,9 @@ function initUi() {
       await api("/clients/" + clientId + "/partner-access", {
         method: "PUT",
         body: JSON.stringify({
-          chargePct: $("#partner-charge-override").value !== "" ? Number($("#partner-charge-override").value) : null,
+          marginPct: $("#partner-margin-override").value !== "" ? Number($("#partner-margin-override").value) : 5,
+          chargePct: null,
+          clearGameChargeOverrides: true,
           providers: readPartnerAccessFromTable(),
         }),
       });
@@ -1160,11 +1186,12 @@ function initUi() {
     const form = e.target;
     try {
       const salsaPct = Number(form.defaultProviderCostPct.value);
-      const chargePct = Number(form.defaultOperatorChargePct.value);
-      if (!Number.isFinite(salsaPct) || !Number.isFinite(chargePct)) {
-        showError("Informe a % da Salsa e a % cobrada do operador.");
+      const marginPct = Number(form.defaultOperatorMarginPct.value);
+      if (!Number.isFinite(salsaPct) || !Number.isFinite(marginPct)) {
+        showError("Informe a % da Salsa e a margem padrão do agregador.");
         return;
       }
+      const chargePct = roundPct(salsaPct + marginPct);
       await api("/integrations/salsa/config", {
         method: "PUT",
         body: JSON.stringify({
@@ -1172,7 +1199,7 @@ function initUi() {
           defaultOperatorChargePct: chargePct,
         }),
       });
-      alert(`Padrão salvo: Salsa ${salsaPct}% · operador ${chargePct}% (vale para todos).`);
+      alert(`Padrão salvo: Salsa ${salsaPct}% · margem ${marginPct}% (cobrança = Salsa + margem).`);
       loadIntegrationsView();
     } catch (err) {
       showError(err.message);
@@ -1216,6 +1243,7 @@ function initUi() {
     $("#client-form-title").textContent = "Novo cliente";
     $("#new-api-key-box").classList.add("hidden");
     $("#client-form").reset();
+    $("#client-form").marginPct.value = 5;
     delete $("#client-form").dataset.editId;
     buildEntitlementsUI($("#entitlements-builder"));
   });
@@ -1229,11 +1257,11 @@ function initUi() {
     showError("");
     const form = e.target;
     const editId = form.dataset.editId;
-    const chargePct = form.chargePct.value !== "" ? Number(form.chargePct.value) : null;
+    const marginPct = form.marginPct.value !== "" ? Number(form.marginPct.value) : 5;
     const body = {
       name: form.name.value,
-      chargePct,
-      marginPct: 0,
+      chargePct: null,
+      marginPct,
       billingMode: form.billingMode.value,
       maxCredit: form.maxCredit.value !== "" ? Number(form.maxCredit.value) : null,
       initialBalance: Number(form.initialBalance.value || 0),
@@ -1249,7 +1277,8 @@ function initUi() {
           method: "PATCH",
           body: JSON.stringify({
             name: body.name,
-            chargePct: body.chargePct,
+            marginPct: body.marginPct,
+            chargePct: null,
             billingMode: body.billingMode,
             maxCredit: body.maxCredit,
             rtpPoolMode: body.rtpPoolMode,
@@ -1297,19 +1326,45 @@ function initUi() {
 
   $("#btn-save-rates").addEventListener("click", async () => {
     if (!state.detailClientId) return;
+    const client = state.clients.find((c) => c.id === state.detailClientId);
+    const defaultMargin = Number(client?.marginPct ?? 0);
     const items = [...$("#client-game-rates-table").querySelectorAll("tbody tr")].map((tr) => {
       const gameId = Number(tr.dataset.gameId);
+      const salsa = Number(tr.querySelector(".repasse-pct").value || tr.querySelector(".repasse-pct").placeholder);
       const repasse = tr.querySelector(".repasse-pct").value;
-      const charge = tr.querySelector(".charge-pct").value;
+      const marginVal = tr.querySelector(".margin-pct").value;
       const rtp = tr.querySelector(".rtp-pct").value;
+      const chargePct =
+        marginVal !== "" && Math.abs(Number(marginVal) - defaultMargin) > 0.001
+          ? roundPct(salsa + Number(marginVal))
+          : null;
       return {
         gameId,
         providerCostPct: repasse !== "" ? Number(repasse) : null,
-        chargePct: charge !== "" ? Number(charge) : null,
+        chargePct,
         rtpPct: rtp !== "" ? Number(rtp) : null,
       };
     });
 
+    try {
+      await api("/clients/" + state.detailClientId + "/game-fees", {
+        method: "PUT",
+        body: JSON.stringify({ items }),
+      });
+      await refreshClientDetail();
+      showError("");
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  $("#btn-reset-game-charges")?.addEventListener("click", async () => {
+    if (!state.detailClientId) return;
+    if (!confirm("Limpar cobrança fixa por jogo e usar só a margem deste sócio (Luck 0 = só Salsa)?")) return;
+    const items = [...$("#client-game-rates-table").querySelectorAll("tbody tr")].map((tr) => ({
+      gameId: Number(tr.dataset.gameId),
+      chargePct: null,
+    }));
     try {
       await api("/clients/" + state.detailClientId + "/game-fees", {
         method: "PUT",

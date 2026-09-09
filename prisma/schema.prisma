@@ -63,9 +63,9 @@ model Client {
   name         String
   apiKeyHash   String   @unique @map("api_key_hash")
   isActive     Boolean  @default(true) @map("is_active")
-  /// Taxa B2B cobrada do operador sobre cada aposta (%) — legado; a cobrança efetiva é chargePct ou o padrão global
-  marginPct    Decimal  @default(0) @map("margin_pct") @db.Decimal(5, 2)
-  /// Override da cobrança total deste operador (%). Null = usa o padrão global (Salsa config)
+  /// Margem do agregador sobre o GGR (%). Cobrança = Salsa + margem. 0 = cobra só a Salsa (ex.: Luck).
+  marginPct    Decimal  @default(5) @map("margin_pct") @db.Decimal(5, 2)
+  /// Override da cobrança total deste operador (%). Null = Salsa do jogo + marginPct
   chargePct    Decimal? @map("charge_pct") @db.Decimal(5, 2)
   billingMode  BillingMode @default(PREPAID) @map("billing_mode")
   /// Limite de crédito negativo (pós-pago). Null = sem limite explícito.

@@ -10,9 +10,14 @@ export interface ResolvedClientGameFees {
   chargePctOverride: number | null;
 }
 
+function roundPct(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 /**
  * % Salsa: jogo (cliente) → sócio+provedor → % do provedor → padrão global.
- * Cobrança: jogo (cliente) → sócio+provedor → cobrança do sócio → padrão global.
+ * Cobrança do operador = override explícito, senão Salsa + margem do sócio.
+ * Margem 0 (ex.: Luck) = cobra somente a Salsa daquele jogo.
  */
 export async function resolveClientGameFees(input: {
   clientId: string;
@@ -46,18 +51,21 @@ export async function resolveClientGameFees(input: {
     }),
   ]);
 
-  const globalSalsa = Number(cfg.defaultProviderCostPct) || input.defaultProviderCostPct;
+  const globalSalsa = Number(cfg.defaultProviderCostPct) || 0;
   const providerSalsa = provider?.defaultCostPct != null ? Number(provider.defaultCostPct) : null;
+  const catalogSalsa = Number.isFinite(input.defaultProviderCostPct) ? input.defaultProviderCostPct : null;
   const accessSalsa = access?.feePct != null ? Number(access.feePct) : null;
   const gameSalsa = gameEnt?.feePct != null ? Number(gameEnt.feePct) : null;
-  const providerCostPct = gameSalsa ?? accessSalsa ?? providerSalsa ?? globalSalsa;
+  const providerCostPct = gameSalsa ?? accessSalsa ?? catalogSalsa ?? providerSalsa ?? globalSalsa;
 
-  const globalCharge =
-    Number(cfg.defaultOperatorChargePct) || roundPct(providerCostPct + input.defaultClientMarginPct);
+  const clientMargin =
+    client?.marginPct != null ? Number(client.marginPct) : Number(input.defaultClientMarginPct) || 0;
+  const derivedCharge = roundPct(providerCostPct + clientMargin);
+
   const clientCharge = client?.chargePct != null ? Number(client.chargePct) : null;
   const accessCharge = access?.chargePct != null ? Number(access.chargePct) : null;
   const gameCharge = gameEnt?.chargePct != null ? Number(gameEnt.chargePct) : null;
-  const totalChargePct = gameCharge ?? accessCharge ?? clientCharge ?? globalCharge;
+  const totalChargePct = gameCharge ?? accessCharge ?? clientCharge ?? derivedCharge;
   const clientMarginPct = Math.max(0, roundPct(totalChargePct - providerCostPct));
 
   return {
@@ -68,8 +76,4 @@ export async function resolveClientGameFees(input: {
     clientFeePct: clientMarginPct,
     chargePctOverride: gameCharge ?? accessCharge ?? clientCharge,
   };
-}
-
-function roundPct(n: number) {
-  return Math.round(n * 100) / 100;
 }
