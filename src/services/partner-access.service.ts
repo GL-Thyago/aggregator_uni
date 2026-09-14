@@ -62,7 +62,7 @@ export async function getPartnerProviderAccess(clientId: string) {
       ...client,
       marginPct: clientMarginPct,
       chargePct: clientChargePct,
-      resolvedChargePct: clientChargePct,
+      resolvedChargePct: clientChargePct ?? roundPct(salsaPct + clientMarginPct),
       yourMarginPct: clientMarginPct,
     },
     providers: providers.map((p) => {

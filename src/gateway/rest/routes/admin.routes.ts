@@ -198,12 +198,13 @@ router.post("/clients/:id/wallet/adjust", async (req, res) => {
 
 router.get("/analytics/overview", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const { getAnalyticsOverview } = await import("../../../services/admin-analytics.service.js");
   const { getBillingReport } = await import("../../../services/billing-report.service.js");
   const [overview, billing] = await Promise.all([
-    getAnalyticsOverview(since, clientId),
-    getBillingReport(since, clientId),
+    getAnalyticsOverview(since, clientId, until),
+    getBillingReport(since, clientId, until),
   ]);
   res.json({
     ...overview,
@@ -212,16 +213,16 @@ router.get("/analytics/overview", async (req, res) => {
     salsaPayable: billing.salsaPayable,
     yourEarn: billing.yourEarn,
     aggregatorRevenue: billing.yourEarn,
-    settlementRule: billing.rule,
   });
 });
 
 router.get("/billing/report", async (req, res) => {
   await ensureSchemaPatches();
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const { getBillingReport } = await import("../../../services/billing-report.service.js");
-  res.json(await getBillingReport(since, clientId));
+  res.json(await getBillingReport(since, clientId, until));
 });
 
 router.get("/billing/spins", async (req, res) => {
@@ -229,6 +230,7 @@ router.get("/billing/spins", async (req, res) => {
   res.json(
     await getBillingSpins({
       since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
       clientId: req.query.clientId ? String(req.query.clientId) : undefined,
       providerId: req.query.providerId ? Number(req.query.providerId) : undefined,
       page: req.query.page ? Number(req.query.page) : 1,
@@ -239,21 +241,25 @@ router.get("/billing/spins", async (req, res) => {
 
 router.get("/billing/export", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
+  const mode = String(req.query.mode || "internal") === "client" ? "client" : "internal";
   const { buildBillingCsv } = await import("../../../services/billing-report.service.js");
-  const csv = await buildBillingCsv(since, clientId);
+  const csv = await buildBillingCsv(since, clientId, until, mode);
   const stamp = new Date().toISOString().slice(0, 10);
+  const prefix = mode === "client" ? "relatorio-cliente" : "relatorio-interno";
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="cobranca-${stamp}.csv"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${prefix}-${stamp}.csv"`);
   res.send(csv);
 });
 
 router.get("/analytics/top-games", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const limit = req.query.limit ? Number(req.query.limit) : 10;
   const { getTopGames } = await import("../../../services/admin-analytics.service.js");
-  res.json(await getTopGames(since, clientId, limit));
+  res.json(await getTopGames(since, clientId, limit, until));
 });
 
 router.get("/analytics/top-games-by-client", async (req, res) => {
@@ -265,16 +271,18 @@ router.get("/analytics/top-games-by-client", async (req, res) => {
 
 router.get("/analytics/client-movement", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const { getClientMovement } = await import("../../../services/admin-analytics.service.js");
-  res.json(await getClientMovement(since));
+  res.json(await getClientMovement(since, until));
 });
 
 router.get("/analytics/timeseries", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
+  const until = req.query.until ? String(req.query.until) : undefined;
   const clientId = req.query.clientId ? String(req.query.clientId) : undefined;
   const gameId = req.query.gameId ? Number(req.query.gameId) : undefined;
   const { getTimeseries } = await import("../../../services/admin-analytics.service.js");
-  res.json(await getTimeseries(since, clientId, gameId));
+  res.json(await getTimeseries(since, clientId, gameId, until));
 });
 
 router.get("/analytics/revenue-by-game", async (req, res) => {

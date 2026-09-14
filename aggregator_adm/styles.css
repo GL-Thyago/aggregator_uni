@@ -86,6 +86,16 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-color: rgba(99, 102, 241, 0.25);
 }
 .sidebar-foot { margin-top: auto; display: grid; gap: 8px; }
+.custom-range {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0c0f16;
+}
+.custom-range label { font-size: 0.7rem; }
+.report-toolbar { align-items: end; flex-wrap: wrap; }
 .main {
   min-width: 0;
   padding: 20px 24px 40px;

@@ -12,6 +12,7 @@ const state = {
   salsaGamesPage: 1,
   billingSpinsPage: 1,
   billingReport: null,
+  reportMode: localStorage.getItem("aggregator_adm_report_mode") || "internal",
   charts: {},
 };
 
@@ -26,11 +27,75 @@ function roundPct(n) {
   return Math.round(Number(n) * 100) / 100;
 }
 
+function toDateInputValue(d) {
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function periodRange() {
+  const preset = $("#period-select")?.value || "30";
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from = todayStart;
+  let to = new Date(todayStart);
+  to.setHours(23, 59, 59, 999);
+
+  if (preset === "today") {
+    from = todayStart;
+  } else if (preset === "yesterday") {
+    from = new Date(todayStart);
+    from.setDate(from.getDate() - 1);
+    to = new Date(from);
+    to.setHours(23, 59, 59, 999);
+  } else if (preset === "month") {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (preset === "last-month") {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  } else if (preset === "custom") {
+    const fromRaw = $("#date-from")?.value;
+    const toRaw = $("#date-to")?.value;
+    from = fromRaw ? new Date(fromRaw + "T00:00:00") : new Date(Date.now() - 30 * 86400000);
+    to = toRaw ? new Date(toRaw + "T23:59:59.999") : new Date();
+  } else {
+    const days = Number(preset) || 30;
+    from = new Date(todayStart);
+    from.setDate(from.getDate() - (days - 1));
+  }
+
+  return { from, to };
+}
+
 function sinceDate() {
-  const days = Number($("#period-select").value || 30);
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
+  return periodRange().from.toISOString();
+}
+
+function untilDate() {
+  return periodRange().to.toISOString();
+}
+
+function isClientReport() {
+  return (state.reportMode || $("#report-mode")?.value || "internal") === "client";
+}
+
+function syncCustomRangeVisibility() {
+  const custom = ($("#period-select")?.value || "") === "custom";
+  $("#custom-range")?.classList.toggle("hidden", !custom);
+  if (custom) {
+    if (!$("#date-from").value) $("#date-from").value = toDateInputValue(new Date(Date.now() - 29 * 86400000));
+    if (!$("#date-to").value) $("#date-to").value = toDateInputValue(new Date());
+  }
+}
+
+function syncReportModeHint() {
+  const hint = $("#report-mode-hint");
+  if (!hint) return;
+  hint.textContent = isClientReport()
+    ? "Visão do cliente: mostra movimento e quanto ele vai pagar. Sem repasse Salsa e sem seu ganho."
+    : "Visão interna: inclui repasse Salsa e seu ganho.";
 }
 
 function setNamedField(form, name, value, { checkbox = false } = {}) {
@@ -104,7 +169,7 @@ async function api(path, opts = {}) {
 }
 
 function qs(extra = {}) {
-  const p = new URLSearchParams({ since: sinceDate(), ...extra });
+  const p = new URLSearchParams({ since: sinceDate(), until: untilDate(), ...extra });
   if (state.selectedClientId) p.set("clientId", state.selectedClientId);
   return "?" + p.toString();
 }
@@ -120,7 +185,7 @@ function setView(name) {
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
-  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", revenue: "Cobrança / Relatório", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
+  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", revenue: "Relatórios", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
   $("#view-title").textContent = titles[name] || name;
   if (name === "dashboard") loadDashboard();
   if (name === "clients") loadClientsView();
@@ -151,9 +216,9 @@ function renderOverviewCards(data) {
     { label: "Apostado", value: money(data.betAmount) },
     { label: "Prêmios", value: money(data.playerPayout ?? data.winAmount), sub: "Pago aos jogadores" },
     { label: "GGR", value: money(ggr), sub: "Apostado − prêmios", cls: ggr < 0 ? "bad" : "" },
-    { label: "Seu ganho", value: money(earn), sub: "% cobrança − % Salsa sobre o GGR", cls: earn > 0 ? "ok" : earn < 0 ? "bad" : "" },
-    { label: "A pagar Salsa", value: money(data.salsaPayable ?? 0), sub: "% Salsa × GGR (pode ser negativo)" },
-    { label: "A cobrar clientes", value: money(data.invoiceable ?? 0), sub: "% cobrança × GGR total" },
+    { label: "Seu ganho", value: money(earn), cls: earn > 0 ? "ok" : earn < 0 ? "bad" : "" },
+    { label: "A pagar Salsa", value: money(data.salsaPayable ?? 0) },
+    { label: "A cobrar clientes", value: money(data.invoiceable ?? 0) },
     { label: "Spins", value: data.spinCount.toLocaleString("pt-BR") },
     { label: "Clientes ativos", value: data.activeClients },
   ].map((c) => `
@@ -423,11 +488,15 @@ async function renderPartnerAccess(clientId) {
 
   const chargeBox = $("#partner-charge-box");
   chargeBox?.classList.remove("hidden");
-  const marginInput = $("#partner-margin-override");
-  marginInput.placeholder = String(data.defaults.operatorMarginPct ?? 5);
-  marginInput.value = data.client.marginPct ?? 5;
-  $("#partner-charge-hint").textContent =
-    `Cobrança = Salsa do jogo/provedor + esta margem. 0 = Luck (só a Salsa). 5 = padrão. Vazio na linha do provedor = usa esta margem.`;
+  const marginInput = $("#partner-margin-override") || $("#partner-charge-override");
+  if (marginInput) {
+    marginInput.placeholder = String(data.defaults.operatorMarginPct ?? 5);
+    marginInput.value = data.client.marginPct ?? 5;
+  }
+  const hint = $("#partner-charge-hint");
+  if (hint) {
+    hint.textContent = "Margem 0 cobra só a % Salsa. Deixe a margem do provedor vazia para usar a margem deste sócio.";
+  }
 
   $("#partner-providers-table").innerHTML = `<table>
     <thead><tr>
@@ -439,7 +508,7 @@ async function renderPartnerAccess(clientId) {
         <td><strong>${p.name}</strong><br><small>${p.sourceName && p.sourceName !== p.name ? p.sourceName + " · " : ""}${p.slug}</small></td>
         <td><input class="rate-input partner-salsa" type="number" step="0.1" min="0" max="50" value="${p.salsaFeePct ?? ""}" placeholder="${p.salsaDefaultPct}"></td>
         <td><input class="rate-input partner-margin" type="number" step="0.1" min="0" max="50" value="${p.marginPct ?? ""}" placeholder="${data.client.yourMarginPct}"></td>
-        <td class="num partner-charge-preview">${Number(p.resolvedChargePct).toFixed(1)}%</td>
+        <td class="num partner-charge-preview">${Number(p.resolvedChargePct ?? roundPct((p.salsaPct ?? 0) + (data.client.yourMarginPct ?? 0))).toFixed(1)}%</td>
         <td class="num">${p.activeGameCount}/${p.gameCount}</td>
       </tr>`).join("")}
     </tbody></table>`;
@@ -477,26 +546,34 @@ function readPartnerAccessFromTable() {
 
 function renderBillingSummary(report) {
   const ggr = report.ggr ?? 0;
-  setHtml("#billing-summary", [
-    { label: "Apostado", value: money(report.betAmount) },
-    { label: "Prêmios", value: money(report.winAmount) },
-    { label: "GGR", value: money(ggr), cls: ggr < 0 ? "bad" : "" },
-    { label: "A cobrar", value: money(report.invoiceable), sub: "% × GGR total", cls: report.invoiceable < 0 ? "bad" : "" },
-    { label: "A pagar Salsa", value: money(report.salsaPayable), cls: report.salsaPayable < 0 ? "bad" : "" },
-    { label: "Seu ganho", value: money(report.yourEarn), cls: report.yourEarn > 0 ? "ok" : report.yourEarn < 0 ? "bad" : "" },
-  ].map((c) => `
+  const clientMode = isClientReport();
+  const cards = clientMode
+    ? [
+        { label: "Apostado", value: money(report.betAmount) },
+        { label: "Prêmios", value: money(report.winAmount) },
+        { label: "GGR", value: money(ggr), cls: ggr < 0 ? "bad" : "" },
+        { label: "Total a pagar", value: money(report.invoiceable), cls: report.invoiceable < 0 ? "bad" : "ok" },
+      ]
+    : [
+        { label: "Apostado", value: money(report.betAmount) },
+        { label: "Prêmios", value: money(report.winAmount) },
+        { label: "GGR", value: money(ggr), cls: ggr < 0 ? "bad" : "" },
+        { label: "A cobrar", value: money(report.invoiceable), cls: report.invoiceable < 0 ? "bad" : "" },
+        { label: "A pagar Salsa", value: money(report.salsaPayable), cls: report.salsaPayable < 0 ? "bad" : "" },
+        { label: "Seu ganho", value: money(report.yourEarn), cls: report.yourEarn > 0 ? "ok" : report.yourEarn < 0 ? "bad" : "" },
+      ];
+  setHtml("#billing-summary", cards.map((c) => `
     <div class="card">
       <div class="label">${c.label}</div>
       <div class="value ${c.cls || ""}">${c.value}</div>
-      ${c.sub ? `<div class="sub">${c.sub}</div>` : ""}
     </div>`).join(""));
-  const rule = $("#billing-rule");
-  if (rule) rule.textContent = report.rule || "";
+  syncReportModeHint();
 }
 
 async function loadRevenueView() {
   showError("");
   state.billingSpinsPage = 1;
+  const clientMode = isClientReport();
   try {
     const report = await api("/billing/report" + qs());
     state.billingReport = report;
@@ -504,7 +581,8 @@ async function loadRevenueView() {
 
     setHtml("#billing-clients-table", report.clients.length ? `<table>
       <thead><tr>
-        <th>Cliente</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>A cobrar</th><th>Salsa</th><th>Seu ganho</th>
+        <th>Cliente</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th>
+        ${clientMode ? "<th>A pagar</th>" : "<th>A cobrar</th><th>Salsa</th><th>Seu ganho</th>"}
       </tr></thead>
       <tbody>${report.clients.map((c) => `
         <tr>
@@ -514,8 +592,9 @@ async function loadRevenueView() {
           <td class="num">${money(c.winAmount)}</td>
           <td class="num ${c.ggr < 0 ? "bad" : "ok"}">${money(c.ggr)}</td>
           <td class="num ${c.chargeAmount < 0 ? "bad" : ""}">${money(c.chargeAmount)}</td>
+          ${clientMode ? "" : `
           <td class="num ${c.salsaDue < 0 ? "bad" : ""}">${money(c.salsaDue)}</td>
-          <td class="num ${c.yourEarn < 0 ? "bad" : "ok"}">${money(c.yourEarn)}</td>
+          <td class="num ${c.yourEarn < 0 ? "bad" : "ok"}">${money(c.yourEarn)}</td>`}
         </tr>`).join("")}
       </tbody></table>` : "<p class='hint'>Sem movimento no período.</p>");
 
@@ -527,7 +606,10 @@ async function loadRevenueView() {
 
     setHtml("#billing-providers-table", report.providers.length ? `<table>
       <thead><tr>
-        <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>
+        <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th>
+        ${clientMode
+          ? "<th>% Cobrança</th><th>A pagar</th>"
+          : "<th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>"}
       </tr></thead>
       <tbody>${report.providers.map((p) => `
         <tr>
@@ -537,10 +619,13 @@ async function loadRevenueView() {
           <td class="num">${money(p.betAmount)}</td>
           <td class="num">${money(p.winAmount)}</td>
           <td class="num ${p.ggr < 0 ? "bad" : "ok"}">${money(p.ggr)}</td>
+          ${clientMode ? `
+          <td class="num">${p.chargePct}%</td>
+          <td class="num ${p.chargeAmount < 0 ? "bad" : ""}">${money(p.chargeAmount)}</td>` : `
           <td class="num">${p.salsaPct}%</td>
           <td class="num">${p.chargePct}%</td>
           <td class="num ${p.chargeAmount < 0 ? "bad" : ""}">${money(p.chargeAmount)}</td>
-          <td class="num ${p.yourEarn < 0 ? "bad" : "ok"}">${money(p.yourEarn)}</td>
+          <td class="num ${p.yourEarn < 0 ? "bad" : "ok"}">${money(p.yourEarn)}</td>`}
         </tr>`).join("")}
       </tbody></table>` : "<p class='hint'>Sem dados por provedor.</p>");
 
@@ -552,10 +637,12 @@ async function loadRevenueView() {
 
 async function loadBillingSpins(page = 1) {
   state.billingSpinsPage = page;
+  const clientMode = isClientReport();
   const data = await api("/billing/spins" + qs({ page, pageSize: 25 }));
   setHtml("#billing-spins-table", data.spins.length ? `<table>
     <thead><tr>
-      <th>Data</th><th>Cliente</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th>
+      <th>Data</th><th>Cliente</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>GGR</th>
+      ${clientMode ? "<th>% Cobrança</th><th>A pagar</th>" : "<th>% Salsa</th><th>% Cobrança</th>"}
     </tr></thead>
     <tbody>${data.spins.map((s) => `
       <tr>
@@ -566,8 +653,11 @@ async function loadBillingSpins(page = 1) {
         <td class="num">${money(s.betAmount)}</td>
         <td class="num">${money(s.winAmount)}</td>
         <td class="num ${s.ggr < 0 ? "bad" : "ok"}">${money(s.ggr)}</td>
-        <td class="num">${s.salsaPct}%</td>
+        ${clientMode ? `
         <td class="num">${s.chargePct}%</td>
+        <td class="num">${money(s.chargeAmount)}</td>` : `
+        <td class="num">${s.salsaPct}%</td>
+        <td class="num">${s.chargePct}%</td>`}
       </tr>`).join("")}
     </tbody></table>` : "<p class='hint'>Sem jogadas neste período.</p>");
 
@@ -584,7 +674,7 @@ async function loadBillingSpins(page = 1) {
 }
 
 async function downloadBillingExcel() {
-  const res = await fetch(state.apiBase + "/billing/export" + qs(), {
+  const res = await fetch(state.apiBase + "/billing/export" + qs({ mode: isClientReport() ? "client" : "internal" }), {
     headers: { "X-Admin-Key": state.adminKey },
   });
   if (!res.ok) throw new Error("Falha ao exportar");
@@ -592,7 +682,7 @@ async function downloadBillingExcel() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `cobranca-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${isClientReport() ? "relatorio-cliente" : "relatorio-interno"}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -605,26 +695,36 @@ function printBillingPdf() {
     showError("Permite pop-ups para gerar o PDF.");
     return;
   }
-  const rows = (report.providers || []).map((p) => `
+  const clientMode = isClientReport();
+  const title = clientMode ? "Relatório do cliente" : "Relatório interno";
+  const rows = (report.providers || []).map((p) => clientMode ? `
+    <tr>
+      <td>${p.clientName}</td><td>${p.providerName}</td><td>${p.spins}</td>
+      <td>${money(p.betAmount)}</td><td>${money(p.winAmount)}</td><td>${money(p.ggr)}</td>
+      <td>${p.chargePct}%</td><td>${money(p.chargeAmount)}</td>
+    </tr>` : `
     <tr>
       <td>${p.clientName}</td><td>${p.providerName}</td><td>${p.spins}</td>
       <td>${money(p.betAmount)}</td><td>${money(p.winAmount)}</td><td>${money(p.ggr)}</td>
       <td>${p.salsaPct}%</td><td>${p.chargePct}%</td>
       <td>${money(p.chargeAmount)}</td><td>${money(p.yourEarn)}</td>
     </tr>`).join("");
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cobrança</title>
+  const summary = clientMode
+    ? `Apostado ${money(report.betAmount)} · Prêmios ${money(report.winAmount)} · GGR ${money(report.ggr)} · Total a pagar ${money(report.invoiceable)}`
+    : `Apostado ${money(report.betAmount)} · Prêmios ${money(report.winAmount)} · GGR ${money(report.ggr)} · A cobrar ${money(report.invoiceable)} · Salsa ${money(report.salsaPayable)} · Seu ganho ${money(report.yourEarn)}`;
+  const head = clientMode
+    ? "<th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Cobrança</th><th>A pagar</th>"
+    : "<th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>";
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
       body { font-family: Segoe UI, sans-serif; color: #111; padding: 24px; }
       h1 { font-size: 20px; } table { width: 100%; border-collapse: collapse; font-size: 12px; }
       th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
       th { background: #f3f3f3; } .num { text-align: right; }
     </style></head><body>
-    <h1>Relatório de cobrança</h1>
-    <p>${report.rule || ""}</p>
-    <p>Apostado ${money(report.betAmount)} · Prêmios ${money(report.winAmount)} · GGR ${money(report.ggr)} · A cobrar ${money(report.invoiceable)} · Salsa ${money(report.salsaPayable)} · Seu ganho ${money(report.yourEarn)}</p>
-    <table><thead><tr>
-      <th>Cliente</th><th>Provedor</th><th>Spins</th><th>Apostado</th><th>Prêmios</th><th>GGR</th><th>% Salsa</th><th>% Cobrança</th><th>A cobrar</th><th>Seu ganho</th>
-    </tr></thead><tbody>${rows}</tbody></table>
+    <h1>${title}</h1>
+    <p>${summary}</p>
+    <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>
     <script>window.onload=function(){window.print();}</script>
     </body></html>`);
   w.document.close();
@@ -959,15 +1059,31 @@ function initAuth() {
 
 function initUi() {
   $$(".nav").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
-  $("#period-select").addEventListener("change", () => {
+  const reloadActive = () => {
     const active = $(".nav.active")?.dataset.view;
     if (active) setView(active);
+  };
+  $("#period-select").addEventListener("change", () => {
+    syncCustomRangeVisibility();
+    if (($("#period-select").value || "") !== "custom") reloadActive();
   });
+  $("#btn-apply-range")?.addEventListener("click", reloadActive);
   $("#client-filter").addEventListener("change", (e) => {
     state.selectedClientId = e.target.value;
-    const active = $(".nav.active")?.dataset.view;
-    if (active) setView(active);
+    reloadActive();
   });
+  const reportMode = $("#report-mode");
+  if (reportMode) {
+    reportMode.value = state.reportMode || "internal";
+    reportMode.addEventListener("change", () => {
+      state.reportMode = reportMode.value;
+      localStorage.setItem("aggregator_adm_report_mode", state.reportMode);
+      syncReportModeHint();
+      if ($(".nav.active")?.dataset.view === "revenue") loadRevenueView();
+    });
+  }
+  syncCustomRangeVisibility();
+  syncReportModeHint();
 
   $("#btn-highlights-refresh")?.addEventListener("click", loadHighlightsView);
 
@@ -1199,7 +1315,7 @@ function initUi() {
           defaultOperatorChargePct: chargePct,
         }),
       });
-      alert(`Padrão salvo: Salsa ${salsaPct}% · margem ${marginPct}% (cobrança = Salsa + margem).`);
+      alert(`Padrão salvo: Salsa ${salsaPct}% · margem ${marginPct}%.`);
       loadIntegrationsView();
     } catch (err) {
       showError(err.message);
@@ -1360,7 +1476,7 @@ function initUi() {
 
   $("#btn-reset-game-charges")?.addEventListener("click", async () => {
     if (!state.detailClientId) return;
-    if (!confirm("Limpar cobrança fixa por jogo e usar só a margem deste sócio (Luck 0 = só Salsa)?")) return;
+    if (!confirm("Limpar cobrança fixa por jogo e usar só a margem deste sócio?")) return;
     const items = [...$("#client-game-rates-table").querySelectorAll("tbody tr")].map((tr) => ({
       gameId: Number(tr.dataset.gameId),
       chargePct: null,

@@ -3,22 +3,45 @@ import { prisma } from "../lib/prisma.js";
 function parseSince(query?: string | Date): Date {
   if (query instanceof Date) return query;
   if (query) {
-    const d = new Date(query);
+    const raw = String(query).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, day] = raw.split("-").map(Number);
+      return new Date(y, m - 1, day, 0, 0, 0, 0);
+    }
+    const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) return d;
   }
   return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+}
+
+function parseUntil(query?: string | Date): Date | undefined {
+  if (!query) return undefined;
+  if (query instanceof Date) return query;
+  const raw = String(query).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, day] = raw.split("-").map(Number);
+    return new Date(y, m - 1, day, 23, 59, 59, 999);
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d;
+}
+
+function createdAtRange(since: Date, until?: Date) {
+  return { gte: since, ...(until ? { lte: until } : {}) };
 }
 
 function round2(v: number) {
   return Math.round(v * 100) / 100;
 }
 
-export async function getAnalyticsOverview(sinceInput?: string | Date, clientId?: string) {
+export async function getAnalyticsOverview(sinceInput?: string | Date, clientId?: string, untilInput?: string | Date) {
   const since = parseSince(sinceInput);
+  const until = parseUntil(untilInput);
 
   const spins = await prisma.gameSpin.findMany({
     where: {
-      createdAt: { gte: since },
+      createdAt: createdAtRange(since, until),
       ...(clientId && { session: { clientId } }),
     },
     select: {
@@ -50,6 +73,7 @@ export async function getAnalyticsOverview(sinceInput?: string | Date, clientId?
 
   return {
     since: since.toISOString(),
+    until: until?.toISOString() ?? null,
     spinCount: spins.length,
     activeClients: clients.size,
     activeGames: games.size,
@@ -64,12 +88,13 @@ export async function getAnalyticsOverview(sinceInput?: string | Date, clientId?
   };
 }
 
-export async function getTopGames(sinceInput?: string | Date, clientId?: string, limit = 10) {
+export async function getTopGames(sinceInput?: string | Date, clientId?: string, limit = 10, untilInput?: string | Date) {
   const since = parseSince(sinceInput);
+  const until = parseUntil(untilInput);
 
   const spins = await prisma.gameSpin.findMany({
     where: {
-      createdAt: { gte: since },
+      createdAt: createdAtRange(since, until),
       ...(clientId && { session: { clientId } }),
     },
     select: {
@@ -179,11 +204,12 @@ export async function getTopGamesByClient(sinceInput?: string | Date, limit = 10
     }));
 }
 
-export async function getClientMovement(sinceInput?: string | Date) {
+export async function getClientMovement(sinceInput?: string | Date, untilInput?: string | Date) {
   const since = parseSince(sinceInput);
+  const until = parseUntil(untilInput);
 
   const spins = await prisma.gameSpin.findMany({
-    where: { createdAt: { gte: since } },
+    where: { createdAt: createdAtRange(since, until) },
     select: {
       betAmount: true,
       winAmount: true,
@@ -257,12 +283,13 @@ export async function getClientMovement(sinceInput?: string | Date) {
     .sort((a, b) => b.betAmount - a.betAmount);
 }
 
-export async function getTimeseries(sinceInput?: string | Date, clientId?: string, gameId?: number) {
+export async function getTimeseries(sinceInput?: string | Date, clientId?: string, gameId?: number, untilInput?: string | Date) {
   const since = parseSince(sinceInput);
+  const until = parseUntil(untilInput);
 
   const spins = await prisma.gameSpin.findMany({
     where: {
-      createdAt: { gte: since },
+      createdAt: createdAtRange(since, until),
       ...(clientId && { session: { clientId } }),
       ...(gameId && { session: { gameId } }),
     },

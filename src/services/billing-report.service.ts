@@ -5,12 +5,45 @@ function round2(v: number) {
   return Math.round(v * 100) / 100;
 }
 
-function parseSince(query?: string): Date {
-  if (query) {
-    const d = new Date(query);
-    if (!Number.isNaN(d.getTime())) return d;
+function startOfLocalDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfLocalDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+function parseBound(query?: string, asEnd = false): Date | undefined {
+  if (!query) return undefined;
+  const raw = String(query).trim();
+  if (!raw) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, day] = raw.split("-").map(Number);
+    const d = new Date(y, m - 1, day);
+    return asEnd ? endOfLocalDay(d) : startOfLocalDay(d);
   }
-  return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d;
+}
+
+function parseSince(query?: string): Date {
+  return parseBound(query) ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+}
+
+function parseUntil(query?: string): Date | undefined {
+  return parseBound(query, true);
+}
+
+function createdAtFilter(since: Date, until?: Date) {
+  return {
+    gte: since,
+    ...(until ? { lte: until } : {}),
+  };
 }
 
 export function settleGgr(ggr: number, salsaPct: number, chargePct: number) {
@@ -134,10 +167,10 @@ type SpinRow = {
   providerSlug: string;
 };
 
-async function loadSpins(since: Date, clientId?: string): Promise<SpinRow[]> {
+async function loadSpins(since: Date, clientId?: string, until?: Date): Promise<SpinRow[]> {
   const spins = await prisma.gameSpin.findMany({
     where: {
-      createdAt: { gte: since },
+      createdAt: createdAtFilter(since, until),
       ...(clientId && { session: { clientId } }),
     },
     select: {
@@ -181,9 +214,10 @@ function providerLabel(p: { displayName?: string | null; name: string }) {
   return p.displayName?.trim() || p.name;
 }
 
-export async function getBillingReport(sinceInput?: string, clientId?: string) {
+export async function getBillingReport(sinceInput?: string, clientId?: string, untilInput?: string) {
   const since = parseSince(sinceInput);
-  const [spins, maps] = await Promise.all([loadSpins(since, clientId), loadRateMaps()]);
+  const until = parseUntil(untilInput);
+  const [spins, maps] = await Promise.all([loadSpins(since, clientId, until), loadRateMaps()]);
 
   const byClient = new Map<
     string,
@@ -296,6 +330,7 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
 
   return {
     since: since.toISOString(),
+    until: until?.toISOString() ?? null,
     clientId: clientId || null,
     scoped: Boolean(clientId),
     spinCount: spins.length,
@@ -305,8 +340,6 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
     invoiceable,
     salsaPayable,
     yourEarn: clientId ? (clientRows[0]?.yourEarn ?? 0) : yourEarnOverall,
-    rule:
-      "Cobrança = % × GGR real (pode ser negativo). A soma dos provedores fecha com o total do cliente.",
     clients: clientRows,
     providers: providerRows.sort((a, b) => b.betAmount - a.betAmount),
   };
@@ -314,18 +347,20 @@ export async function getBillingReport(sinceInput?: string, clientId?: string) {
 
 export async function getBillingSpins(options: {
   since?: string;
+  until?: string;
   clientId?: string;
   providerId?: number;
   page?: number;
   pageSize?: number;
 }) {
   const since = parseSince(options.since);
+  const until = parseUntil(options.until);
   const pageSize = Math.min(100, Math.max(10, options.pageSize ?? 25));
   const page = Math.max(1, options.page ?? 1);
   const maps = await loadRateMaps();
 
   const where = {
-    createdAt: { gte: since },
+    createdAt: createdAtFilter(since, until),
     session: {
       ...(options.clientId && { clientId: options.clientId }),
       ...(options.providerId && { game: { providerId: options.providerId } }),
@@ -390,50 +425,86 @@ export async function getBillingSpins(options: {
   };
 }
 
-export async function buildBillingCsv(sinceInput?: string, clientId?: string) {
-  const report = await getBillingReport(sinceInput, clientId);
+export async function buildBillingCsv(
+  sinceInput?: string,
+  clientId?: string,
+  untilInput?: string,
+  mode: "internal" | "client" = "internal",
+) {
+  const report = await getBillingReport(sinceInput, clientId, untilInput);
   const lines: string[][] = [];
   const money = (n: number) => n.toFixed(2).replace(".", ",");
+  const isClient = mode === "client";
 
-  lines.push(["Relatório de cobrança"]);
-  lines.push(["Período desde", new Date(report.since).toLocaleString("pt-BR")]);
+  lines.push([isClient ? "Relatório do cliente" : "Relatório interno"]);
+  lines.push(["Período de", new Date(report.since).toLocaleString("pt-BR")]);
+  if (report.until) lines.push(["Período até", new Date(report.until).toLocaleString("pt-BR")]);
   lines.push(["Apostado", money(report.betAmount)]);
   lines.push(["Prêmios", money(report.winAmount)]);
   lines.push(["GGR", money(report.ggr)]);
-  lines.push(["A cobrar dos clientes", money(report.invoiceable)]);
-  lines.push(["A pagar à Salsa", money(report.salsaPayable)]);
-  lines.push(["Seu ganho", money(report.yourEarn)]);
-  lines.push([report.rule]);
-  lines.push([]);
-  lines.push(["Cliente", "Spins", "Apostado", "Prêmios", "GGR", "A cobrar", "Salsa", "Seu ganho"]);
-  for (const c of report.clients) {
-    lines.push([
-      c.clientName,
-      String(c.spins),
-      money(c.betAmount),
-      money(c.winAmount),
-      money(c.ggr),
-      money(c.chargeAmount),
-      money(c.salsaDue),
-      money(c.yourEarn),
-    ]);
+  lines.push([isClient ? "Total a pagar" : "A cobrar dos clientes", money(report.invoiceable)]);
+  if (!isClient) {
+    lines.push(["A pagar à Salsa", money(report.salsaPayable)]);
+    lines.push(["Seu ganho", money(report.yourEarn)]);
   }
   lines.push([]);
-  lines.push(["Cliente", "Provedor", "Spins", "Apostado", "Prêmios", "GGR", "% Salsa", "% Cobrança", "A cobrar", "Salsa", "Seu ganho"]);
-  for (const p of report.providers) {
-    lines.push([
-      p.clientName,
-      p.providerName,
-      String(p.spins),
-      money(p.betAmount),
-      money(p.winAmount),
-      money(p.ggr),
-      String(p.salsaPct).replace(".", ","),
-      String(p.chargePct).replace(".", ","),
-      money(p.chargeAmount),
-      money(p.salsaDue),
-      money(p.yourEarn),
-    ]);
+  if (isClient) {
+    lines.push(["Cliente", "Spins", "Apostado", "Prêmios", "GGR", "A pagar"]);
+    for (const c of report.clients) {
+      lines.push([
+        c.clientName,
+        String(c.spins),
+        money(c.betAmount),
+        money(c.winAmount),
+        money(c.ggr),
+        money(c.chargeAmount),
+      ]);
+    }
+    lines.push([]);
+    lines.push(["Cliente", "Provedor", "Spins", "Apostado", "Prêmios", "GGR", "% Cobrança", "A pagar"]);
+    for (const p of report.providers) {
+      lines.push([
+        p.clientName,
+        p.providerName,
+        String(p.spins),
+        money(p.betAmount),
+        money(p.winAmount),
+        money(p.ggr),
+        String(p.chargePct).replace(".", ","),
+        money(p.chargeAmount),
+      ]);
+    }
+  } else {
+    lines.push(["Cliente", "Spins", "Apostado", "Prêmios", "GGR", "A cobrar", "Salsa", "Seu ganho"]);
+    for (const c of report.clients) {
+      lines.push([
+        c.clientName,
+        String(c.spins),
+        money(c.betAmount),
+        money(c.winAmount),
+        money(c.ggr),
+        money(c.chargeAmount),
+        money(c.salsaDue),
+        money(c.yourEarn),
+      ]);
+    }
+    lines.push([]);
+    lines.push(["Cliente", "Provedor", "Spins", "Apostado", "Prêmios", "GGR", "% Salsa", "% Cobrança", "A cobrar", "Salsa", "Seu ganho"]);
+    for (const p of report.providers) {
+      lines.push([
+        p.clientName,
+        p.providerName,
+        String(p.spins),
+        money(p.betAmount),
+        money(p.winAmount),
+        money(p.ggr),
+        String(p.salsaPct).replace(".", ","),
+        String(p.chargePct).replace(".", ","),
+        money(p.chargeAmount),
+        money(p.salsaDue),
+        money(p.yourEarn),
+      ]);
+    }
   }
 
   const csv = `\uFEFF${lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\r\n")}`;

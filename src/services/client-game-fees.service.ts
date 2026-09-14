@@ -17,7 +17,7 @@ function roundPct(n: number) {
 /**
  * % Salsa: jogo (cliente) → sócio+provedor → % do provedor → padrão global.
  * Cobrança do operador = override explícito, senão Salsa + margem do sócio.
- * Margem 0 (ex.: Luck) = cobra somente a Salsa daquele jogo.
+ * Margem 0 = cobra somente a % Salsa daquele jogo.
  */
 export async function resolveClientGameFees(input: {
   clientId: string;
