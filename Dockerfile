@@ -26,6 +26,7 @@ COPY src ./src
 COPY scripts ./scripts
 COPY admin ./admin
 COPY aggregator_adm ./aggregator_adm
+COPY provider_adm ./provider_adm
 
 RUN npx prisma generate && npm prune --omit=dev
 
@@ -48,6 +49,7 @@ COPY scripts ./scripts
 COPY src ./src
 COPY admin ./admin
 COPY aggregator_adm ./aggregator_adm
+COPY provider_adm ./provider_adm
 COPY docker-entrypoint.sh ./
 
 RUN chmod +x docker-entrypoint.sh \
