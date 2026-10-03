@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal de Provedores</title>
+  <link rel="stylesheet" href="/aggregator-adm/styles.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="auth-screen" class="auth-screen">
+    <form id="login-form" class="auth-card">
+      <h1>Portal de Provedores</h1>
+      <p>Acesso separado para comissão Salsa e imagens.</p>
+      <label>Senha deste portal
+        <input name="password" type="password" minlength="8" autocomplete="current-password" required>
+      </label>
+      <button type="submit">Entrar</button>
+      <p id="login-error" class="err-text"></p>
+    </form>
+  </div>
+
+  <main id="portal" class="portal hidden">
+    <header class="portal-header">
+      <div>
+        <h1>Portal de Provedores</h1>
+        <p>Comissão Salsa, logos, capas e links dos jogos</p>
+      </div>
+      <button id="logout" class="ghost">Sair</button>
+    </header>
+    <div id="error" class="banner err hidden"></div>
+    <div id="storage-warning" class="banner warning hidden">
+      O S3 ainda não está configurado. O cadastro por URL funciona, mas o upload de arquivos ficará indisponível.
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Provedor</h3>
+        <select id="provider-select">
+          <option value="">Escolha o provedor</option>
+        </select>
+      </div>
+      <form id="provider-form" class="form-grid hidden">
+        <label>Comissão Salsa (%)
+          <input name="defaultCostPct" type="number" step="0.1" min="0" max="50" required>
+        </label>
+        <label>Logo por URL
+          <input name="logoUrl" type="url" maxlength="2048" placeholder="https://...">
+        </label>
+        <label>Ou enviar logo (PNG, JPG, WEBP ou GIF; até 5 MB)
+          <input name="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+        </label>
+        <div id="logo-preview" class="provider-image-preview"></div>
+        <div class="full actions">
+          <button type="submit">Salvar comissão e logo</button>
+          <button type="button" id="apply-cost" class="ghost">Aplicar comissão a todos os jogos</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="games-panel" class="panel hidden">
+      <div class="panel-head">
+        <h3 id="games-title">Jogos</h3>
+        <button id="refresh-games" class="ghost">Atualizar</button>
+      </div>
+      <p class="hint">O arquivo enviado fica salvo no S3 e a nova imagem é devolvida imediatamente pelo catálogo.</p>
+      <div id="games-table" class="table-wrap"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -348,6 +348,15 @@ model SalsaIntegrationConfig {
   @@map("salsa_integration_config")
 }
 
+/// Credencial exclusiva do portal restrito de provedores.
+model ProviderPortalConfig {
+  id           Int      @id @default(1)
+  passwordHash String   @map("password_hash")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("provider_portal_config")
+}
+
 /// Controle global de RTP por jogo — caixa da casa + pool de prêmios
 model GameRtpLedger {
   gameId       Int      @id @map("game_id")

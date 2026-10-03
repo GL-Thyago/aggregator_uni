@@ -20,6 +20,30 @@ router.get("/session", (_req, res) => {
   res.json({ ok: true, role: "admin" });
 });
 
+router.get("/provider-portal/config", async (_req, res) => {
+  const { isProviderPortalConfigured } = await import("../../../services/provider-portal-auth.service.js");
+  const { isCatalogImageStorageConfigured } = await import("../../../services/catalog-image-storage.service.js");
+  res.json({
+    configured: await isProviderPortalConfigured(),
+    storageConfigured: isCatalogImageStorageConfigured(),
+    path: "/provider-admin/",
+  });
+});
+
+router.put("/provider-portal/password", async (req, res) => {
+  const parsed = z.object({
+    password: z.string().min(8).max(200),
+    confirmation: z.string().min(8).max(200),
+  }).safeParse(req.body);
+  if (!parsed.success || parsed.data.password !== parsed.data.confirmation) {
+    res.status(400).json({ error: "Informe senhas iguais com no mínimo 8 caracteres" });
+    return;
+  }
+  const { setProviderPortalPassword } = await import("../../../services/provider-portal-auth.service.js");
+  const result = await setProviderPortalPassword(parsed.data.password);
+  res.json({ ok: true, configured: true, updatedAt: result.updatedAt, path: "/provider-admin/" });
+});
+
 const createClientSchema = z.object({
   name: z.string().min(2),
   marginPct: z.number().min(0).max(50).default(5),

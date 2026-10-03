@@ -13,6 +13,7 @@ import walletRoutes from "./routes/wallet.routes.js";
 import gamePlayRoutes, { handlePlayRequest } from "./routes/game-play.routes.js";
 import salsaRoutes from "./routes/salsa.routes.js";
 import uniRoutes from "./routes/uni.routes.js";
+import providerPortalRoutes from "./routes/provider-portal.routes.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -63,6 +64,9 @@ export function createRestServer(): express.Application {
   app.get("/aggregator-adm", (_req, res) => sendIndex("aggregator_adm", res));
   app.get("/aggregator-adm/", (_req, res) => sendIndex("aggregator_adm", res));
   app.use("/aggregator-adm", express.static(path.join(repoRoot, "aggregator_adm")));
+  app.get("/provider-admin", (_req, res) => sendIndex("provider_adm", res));
+  app.get("/provider-admin/", (_req, res) => sendIndex("provider_adm", res));
+  app.use("/provider-admin", express.static(path.join(repoRoot, "provider_adm")));
   app.get("/admin-panel", (_req, res) => sendIndex("admin", res));
   app.get("/admin-panel/", (_req, res) => sendIndex("admin", res));
   app.use("/admin-panel", express.static(path.join(repoRoot, "admin")));
@@ -101,6 +105,7 @@ export function createRestServer(): express.Application {
   app.use("/api/v1", walletRoutes);
   app.use("/api/v1", gamePlayRoutes);
   app.use("/admin/v1", adminRoutes);
+  app.use("/provider/v1", providerPortalRoutes);
 
   app.use(
     (

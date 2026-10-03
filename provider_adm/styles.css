@@ -1,0 +1,49 @@
+.portal {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+.portal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.portal-header h1 { margin: 0; font-size: 1.5rem; }
+.portal-header p { margin: 4px 0 0; color: var(--muted); }
+.banner.warning {
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+.provider-image-preview {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  overflow: hidden;
+}
+.provider-image-preview img {
+  width: 100%;
+  height: 86px;
+  object-fit: contain;
+  background: #0c0f16;
+}
+.catalog-thumb {
+  width: 90px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #0c0f16;
+}
+.catalog-url-input { width: min(380px, 30vw); min-width: 240px; padding: 7px 9px; }
+.game-file { min-width: 220px; max-width: 280px; }
+.provider-games-table td { white-space: normal; }
+@media (max-width: 700px) {
+  .portal { padding: 14px; }
+  .catalog-url-input { width: 260px; }
+}

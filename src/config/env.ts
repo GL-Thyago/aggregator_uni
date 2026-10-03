@@ -45,6 +45,16 @@ const envSchema = z.object({
   /** URL pública que a Salsa chama (túnel/produção). Sem isso, localhost gera Communication error. */
   SALSA_PUBLISHER_URL: z.string().optional(),
   SALSA_DEFAULT_COST_PCT: z.coerce.number().default(6.5),
+
+  /** Bucket persistente para logos de provedores e capas de jogos. */
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().default("us-east-1"),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_PUBLIC_BASE_URL: z.string().url().optional(),
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .optional()
+    .transform((v) => v === "1" || v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;

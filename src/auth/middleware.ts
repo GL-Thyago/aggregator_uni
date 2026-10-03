@@ -70,6 +70,21 @@ export function adminMiddleware(
   next();
 }
 
+export async function providerPortalMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const { verifyProviderPortalToken } = await import("../services/provider-portal-auth.service.js");
+  if (!token || !verifyProviderPortalToken(token)) {
+    res.status(401).json({ error: "Acesso de provedor inválido ou expirado" });
+    return;
+  }
+  next();
+}
+
 export async function sessionMiddleware(
   req: AuthenticatedRequest,
   res: Response,

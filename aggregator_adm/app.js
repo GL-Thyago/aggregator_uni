@@ -7,8 +7,6 @@ const state = {
   clients: [],
   games: [],
   categories: [],
-  providers: [],
-  catalogProviderId: "",
   selectedClientId: "",
   detailClientId: null,
   salsaGamesPage: 1,
@@ -556,101 +554,26 @@ function readPartnerAccessFromTable() {
   });
 }
 
-function renderProviderLogoPreview(url) {
-  const preview = $("#provider-logo-preview");
-  if (!preview) return;
-  preview.innerHTML = url
-    ? `<img src="${escapeHtml(url)}" alt="Imagem do provedor" onerror="this.parentElement.classList.add('image-error')">`
-    : "<span>Sem imagem cadastrada</span>";
-  preview.classList.remove("image-error");
-}
-
 async function loadProvidersCatalogView() {
   showError("");
   try {
-    state.providers = await api("/providers");
-    const select = $("#catalog-provider-select");
-    const current = state.catalogProviderId || select.value;
-    select.innerHTML = '<option value="">Escolha o provedor</option>' +
-      state.providers.map((provider) =>
-        `<option value="${provider.id}">${escapeHtml(provider.displayName || provider.name)}</option>`,
-      ).join("");
-    if (state.providers.some((provider) => String(provider.id) === String(current))) {
-      select.value = String(current);
-    }
-    if (select.value) await loadSelectedProviderCatalog(select.value);
-    else {
-      $("#provider-catalog-form").classList.add("hidden");
-      $("#provider-games-panel").classList.add("hidden");
-    }
+    const status = await api("/provider-portal/config");
+    $("#provider-portal-status").innerHTML = [
+      {
+        label: "Senha separada",
+        value: status.configured ? "Configurada" : "Ainda não criada",
+        cls: status.configured ? "ok" : "warn",
+      },
+      {
+        label: "Armazenamento de imagens",
+        value: status.storageConfigured ? "S3 configurado" : "Configure o S3",
+        cls: status.storageConfigured ? "ok" : "warn",
+      },
+      { label: "Endereço", value: status.path || "/provider-admin/" },
+    ].map((card) => `<div class="card"><div class="label">${card.label}</div><div class="value ${card.cls || ""}">${card.value}</div></div>`).join("");
   } catch (e) {
     showError(e.message);
   }
-}
-
-async function loadSelectedProviderCatalog(providerId) {
-  if (!providerId) return;
-  state.catalogProviderId = String(providerId);
-  const data = await api(`/providers/${providerId}/games`);
-  const provider = data.provider;
-  const form = $("#provider-catalog-form");
-  form.classList.remove("hidden");
-  form.defaultCostPct.value = provider.defaultCostPct ?? "";
-  form.logoUrl.value = provider.logoUrl ?? "";
-  renderProviderLogoPreview(provider.logoUrl);
-
-  $("#provider-games-panel").classList.remove("hidden");
-  $("#provider-games-title").textContent = `Jogos de ${provider.displayName || provider.name}`;
-  const rows = data.games || [];
-  $("#provider-games-table").innerHTML = rows.length ? `<table class="provider-games-table">
-    <thead><tr><th>Jogo</th><th>Capa atual</th><th>Nova imagem (URL)</th><th>Link do jogo</th><th>Ações</th></tr></thead>
-    <tbody>${rows.map((game) => {
-      const cover = game.thumbnailUrl
-        ? `/api/v1/media/cover/${encodeURIComponent(game.slug)}`
-        : "";
-      const editableCover = /^https?:\/\//i.test(game.thumbnailUrl || "") ? game.thumbnailUrl : "";
-      return `<tr data-game-id="${game.id}">
-        <td><strong>${escapeHtml(game.name)}</strong><br><small>${escapeHtml(game.externalGameId || game.slug)}</small></td>
-        <td>${cover
-          ? `<img class="catalog-thumb" src="${escapeHtml(cover)}" alt="${escapeHtml(game.name)}">`
-          : '<span class="hint">Sem capa</span>'}</td>
-        <td><input class="game-thumbnail-url catalog-url-input" type="url" maxlength="2048" value="${escapeHtml(editableCover)}" placeholder="${game.thumbnailUrl && !editableCover ? "Imagem interna Salsa — cole para substituir" : "https://..."}"></td>
-        <td><input class="game-external-url catalog-url-input" type="url" maxlength="2048" value="${escapeHtml(game.externalUrl || "")}" placeholder="https://..."></td>
-        <td>
-          <button type="button" class="ghost btn-save-game-catalog">Salvar</button>
-          <button type="button" class="ghost danger btn-clear-game-cover">Remover capa</button>
-        </td>
-      </tr>`;
-    }).join("")}</tbody>
-  </table>` : "<p class='hint'>Este provedor ainda não possui jogos.</p>";
-
-  $$(".btn-save-game-catalog").forEach((button) => button.addEventListener("click", async () => {
-    const row = button.closest("tr");
-    const thumbnailUrl = row.querySelector(".game-thumbnail-url").value.trim();
-    const externalUrl = row.querySelector(".game-external-url").value.trim();
-    const body = { externalUrl: externalUrl || null };
-    if (thumbnailUrl) body.thumbnailUrl = thumbnailUrl;
-    try {
-      await api(`/games/${row.dataset.gameId}`, { method: "PATCH", body: JSON.stringify(body) });
-      await loadSelectedProviderCatalog(state.catalogProviderId);
-    } catch (error) {
-      showError(error.message);
-    }
-  }));
-
-  $$(".btn-clear-game-cover").forEach((button) => button.addEventListener("click", async () => {
-    const row = button.closest("tr");
-    if (!confirm("Remover a capa cadastrada deste jogo?")) return;
-    try {
-      await api(`/games/${row.dataset.gameId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ thumbnailUrl: null }),
-      });
-      await loadSelectedProviderCatalog(state.catalogProviderId);
-    } catch (error) {
-      showError(error.message);
-    }
-  }));
 }
 
 function renderBillingSummary(report) {
@@ -1196,70 +1119,27 @@ function initUi() {
 
   $("#btn-highlights-refresh")?.addEventListener("click", loadHighlightsView);
 
-  $("#catalog-provider-select")?.addEventListener("change", async (event) => {
-    const id = event.target.value;
-    state.catalogProviderId = id;
-    if (!id) {
-      $("#provider-catalog-form").classList.add("hidden");
-      $("#provider-games-panel").classList.add("hidden");
+  $("#provider-portal-password-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    if (form.password.value !== form.confirmation.value) {
+      showError("As duas senhas precisam ser iguais.");
       return;
     }
     try {
-      await loadSelectedProviderCatalog(id);
-    } catch (error) {
-      showError(error.message);
-    }
-  });
-
-  $("#provider-catalog-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!state.catalogProviderId) return;
-    const form = event.target;
-    try {
-      await api(`/providers/${state.catalogProviderId}`, {
-        method: "PATCH",
+      await api("/provider-portal/password", {
+        method: "PUT",
         body: JSON.stringify({
-          defaultCostPct: Number(form.defaultCostPct.value),
-          logoUrl: form.logoUrl.value.trim() || null,
+          password: form.password.value,
+          confirmation: form.confirmation.value,
         }),
       });
+      form.reset();
       await loadProvidersCatalogView();
-      alert("Comissão e imagem do provedor salvas.");
+      alert("Senha do portal de provedores salva.");
     } catch (error) {
       showError(error.message);
     }
-  });
-
-  $("#provider-catalog-form input[name='logoUrl']")?.addEventListener("input", (event) => {
-    renderProviderLogoPreview(event.target.value.trim());
-  });
-
-  $("#btn-apply-catalog-cost")?.addEventListener("click", async () => {
-    if (!state.catalogProviderId) return;
-    const costPct = Number($("#provider-catalog-form").defaultCostPct.value);
-    if (!Number.isFinite(costPct)) {
-      showError("Informe a comissão Salsa do provedor.");
-      return;
-    }
-    if (!confirm(`Aplicar ${costPct}% a todos os jogos deste provedor?`)) return;
-    try {
-      await api(`/providers/${state.catalogProviderId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ defaultCostPct: costPct }),
-      });
-      const result = await api(`/providers/${state.catalogProviderId}/apply-cost`, {
-        method: "POST",
-        body: JSON.stringify({ costPct }),
-      });
-      await loadSelectedProviderCatalog(state.catalogProviderId);
-      alert(`Comissão aplicada em ${result.gamesUpdated ?? 0} jogos.`);
-    } catch (error) {
-      showError(error.message);
-    }
-  });
-
-  $("#btn-refresh-provider-games")?.addEventListener("click", () => {
-    if (state.catalogProviderId) loadSelectedProviderCatalog(state.catalogProviderId);
   });
 
   $("#partner-client-select")?.addEventListener("change", async (e) => {

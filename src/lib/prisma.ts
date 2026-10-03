@@ -34,6 +34,11 @@ export function ensureSchemaPatches() {
         `ALTER TABLE game_providers ADD COLUMN IF NOT EXISTS logo_url TEXT`,
         `ALTER TABLE clients ADD COLUMN IF NOT EXISTS charge_pct DECIMAL(5,2)`,
         `ALTER TABLE salsa_integration_config ADD COLUMN IF NOT EXISTS default_operator_charge_pct DECIMAL(5,2) DEFAULT 20`,
+        `CREATE TABLE IF NOT EXISTS provider_portal_config (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          password_hash TEXT NOT NULL,
+          updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`,
         `CREATE TABLE IF NOT EXISTS client_provider_access (
           id TEXT PRIMARY KEY,
           client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,

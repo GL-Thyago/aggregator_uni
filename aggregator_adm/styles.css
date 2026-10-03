@@ -51,6 +51,16 @@ button {
   cursor: pointer;
 }
 button.ghost { background: transparent; border: 1px solid var(--border); }
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
 button.ghost.danger { border-color: rgba(239, 68, 68, 0.45); color: #fca5a5; }
 button:hover { opacity: 0.92; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
