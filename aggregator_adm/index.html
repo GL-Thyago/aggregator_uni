@@ -28,6 +28,7 @@
         <button data-view="dashboard" class="nav active">Dashboard</button>
         <button data-view="clients" class="nav">Clientes</button>
         <button data-view="partners" class="nav">Sócios</button>
+        <button data-view="providers" class="nav">Provedores</button>
         <button data-view="revenue" class="nav">Relatórios</button>
         <button data-view="integrations" class="nav">Integrações</button>
         <button data-view="highlights" class="nav">Top 10 / Destaques</button>
@@ -183,6 +184,39 @@
           <div class="inline-form">
             <button type="button" id="btn-save-partner-access" disabled>Salvar acesso e cobrança</button>
           </div>
+        </div>
+      </section>
+
+      <section id="view-providers" class="view hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Comissão e imagens dos provedores</h3>
+            <select id="catalog-provider-select">
+              <option value="">Escolha o provedor</option>
+            </select>
+          </div>
+          <p class="hint">Este acesso contém somente a comissão Salsa, a imagem do provedor e as capas/links dos jogos.</p>
+          <form id="provider-catalog-form" class="form-grid hidden">
+            <label>Comissão Salsa do provedor (%)
+              <input name="defaultCostPct" type="number" step="0.1" min="0" max="50" required>
+            </label>
+            <label class="provider-logo-field">Imagem/logo do provedor (URL)
+              <input name="logoUrl" type="url" maxlength="2048" placeholder="https://...">
+            </label>
+            <div class="provider-image-preview" id="provider-logo-preview"></div>
+            <div class="full actions">
+              <button type="submit">Salvar comissão e imagem</button>
+              <button type="button" id="btn-apply-catalog-cost" class="ghost">Aplicar comissão a todos os jogos</button>
+            </div>
+          </form>
+        </div>
+        <div id="provider-games-panel" class="panel hidden">
+          <div class="panel-head">
+            <h3 id="provider-games-title">Jogos do provedor</h3>
+            <button type="button" id="btn-refresh-provider-games" class="ghost">Atualizar</button>
+          </div>
+          <p class="hint">A nova capa e o novo link passam a ser devolvidos no catálogo da API imediatamente.</p>
+          <div class="table-wrap" id="provider-games-table"></div>
         </div>
       </section>
 

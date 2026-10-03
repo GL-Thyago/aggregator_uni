@@ -104,7 +104,8 @@ router.get("/categories", authMiddleware, async (req: AuthenticatedRequest, res)
 
 router.get("/games", authMiddleware, async (req: AuthenticatedRequest, res) => {
   const allowedGameIds = await getAllowedGameIds(req.client!.id);
-  let games = await listGamesForClient(req.client!.id, allowedGameIds);
+  const providerSlug = req.query.provider ? String(req.query.provider).trim() : undefined;
+  let games = await listGamesForClient(req.client!.id, allowedGameIds, providerSlug);
 
   if (req.query.featured === "1") {
     games = games.filter((g) => g.isFeatured);
@@ -222,6 +223,33 @@ router.get("/catalog/providers", authMiddleware, async (_req, res) => {
         sourceName: p.name,
       })),
     ),
+  );
+});
+
+router.get("/catalog/providers/:slug/games", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const providerSlug = decodeURIComponent(String(req.params.slug)).trim();
+  const provider = await prisma.gameProvider.findUnique({
+    where: { slug: providerSlug },
+    select: { id: true, slug: true, name: true, displayName: true, logoUrl: true, isActive: true },
+  });
+  if (!provider || !provider.isActive) {
+    res.status(404).json({ error: "Provider not found" });
+    return;
+  }
+
+  const allowedGameIds = await getAllowedGameIds(req.client!.id);
+  const games = await listGamesForClient(req.client!.id, allowedGameIds, providerSlug);
+  res.set("Cache-Control", "private, max-age=5, stale-while-revalidate=15");
+  res.json(
+    serializeBigInt({
+      provider: {
+        ...provider,
+        name: provider.displayName?.trim() || provider.name,
+        sourceName: provider.name,
+      },
+      count: games.length,
+      games: games.map((game) => toClientGameDto(game)),
+    }),
   );
 });
 

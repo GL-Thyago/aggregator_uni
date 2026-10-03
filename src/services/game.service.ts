@@ -23,7 +23,7 @@ type GameWithRelations = {
   aggregatorFeePct: unknown;
   isFeatured: boolean;
   category: { id: number; slug: string; name: string };
-  provider: { id: number; slug: string; name: string; displayName?: string | null };
+  provider: { id: number; slug: string; name: string; displayName?: string | null; logoUrl?: string | null };
 };
 
 export function resolveProviderLabel(provider: {
@@ -94,6 +94,7 @@ export function toClientGameDto(g: GameWithRelations) {
     providerName: resolveProviderLabel(g.provider),
     providerSlug: g.provider.slug,
     providerSourceName: g.provider.name,
+    providerLogoUrl: g.provider.logoUrl ?? null,
     gameType: g.gameType,
     playMode: external ? ("external" as const) : ("embedded" as const),
     ...(g.rtp !== undefined ? { rtp: decimalToString(g.rtp) } : {}),
@@ -102,7 +103,11 @@ export function toClientGameDto(g: GameWithRelations) {
   };
 }
 
-export async function listGamesForClient(clientId: string, allowedGameIds: number[]) {
+export async function listGamesForClient(
+  clientId: string,
+  allowedGameIds: number[],
+  providerSlug?: string,
+) {
   if (!allowedGameIds.length) return [];
 
   return prisma.game.findMany({
@@ -111,7 +116,11 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       isActive: true,
       engine: "EXTERNAL",
       externalGameId: { not: null },
-      provider: { isActive: true, integration: "SALSA" },
+      provider: {
+        isActive: true,
+        integration: "SALSA",
+        ...(providerSlug && { slug: providerSlug }),
+      },
     },
     select: {
       id: true,
@@ -128,7 +137,7 @@ export async function listGamesForClient(clientId: string, allowedGameIds: numbe
       isFeatured: true,
       sortOrder: true,
       category: { select: { id: true, slug: true, name: true } },
-      provider: { select: { id: true, slug: true, name: true, displayName: true } },
+      provider: { select: { id: true, slug: true, name: true, displayName: true, logoUrl: true } },
     },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
   });

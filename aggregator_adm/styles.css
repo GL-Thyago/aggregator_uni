@@ -257,6 +257,38 @@ textarea {
 }
 .rate-input { width: 72px; padding: 6px 8px; text-align: center; }
 .prov-display-name { width: 160px; padding: 6px 8px; }
+.provider-logo-field { min-width: min(420px, 100%); }
+.provider-image-preview {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  overflow: hidden;
+}
+.provider-image-preview img {
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  background: #0c0f16;
+}
+.provider-image-preview.image-error::after {
+  content: "Não foi possível carregar a imagem";
+  color: var(--red);
+  padding: 12px;
+}
+.provider-image-preview.image-error img { display: none; }
+.catalog-thumb {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #0c0f16;
+}
+.catalog-url-input { width: min(360px, 28vw); min-width: 220px; padding: 7px 9px; }
+.provider-games-table td { white-space: normal; }
 .config-pre {
   background: #0c0f16;
   border: 1px solid var(--border);

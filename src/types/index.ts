@@ -34,6 +34,7 @@ export interface SyncGamesResponse {
     providerId: number;
     providerSlug: string;
     providerName: string;
+    providerLogoUrl: string | null;
     gameType: string;
     engine: string;
     launchUrl: string;

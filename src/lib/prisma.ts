@@ -31,6 +31,7 @@ export function ensureSchemaPatches() {
     schemaReady = (async () => {
       const statements = [
         `ALTER TABLE game_providers ADD COLUMN IF NOT EXISTS display_name TEXT`,
+        `ALTER TABLE game_providers ADD COLUMN IF NOT EXISTS logo_url TEXT`,
         `ALTER TABLE clients ADD COLUMN IF NOT EXISTS charge_pct DECIMAL(5,2)`,
         `ALTER TABLE salsa_integration_config ADD COLUMN IF NOT EXISTS default_operator_charge_pct DECIMAL(5,2) DEFAULT 20`,
         `CREATE TABLE IF NOT EXISTS client_provider_access (

@@ -35,6 +35,10 @@ export interface SyncGamesResponse {
     slug: string;
     name: string;
     categorySlug: string;
+    providerId: number;
+    providerSlug: string;
+    providerName: string;
+    providerLogoUrl: string | null;
     launchUrl: string;
     thumbnailUrl: string | null;
     rtp: string | null;

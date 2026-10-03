@@ -192,6 +192,8 @@ model GameProvider {
   name           String
   /// Nome no cassino. Null = usa `name`. O sync não sobrescreve.
   displayName    String?             @map("display_name")
+  /// Logo/capa do provedor exibida no catálogo dos cassinos.
+  logoUrl        String?             @map("logo_url")
   isActive       Boolean             @default(true) @map("is_active")
   integration    ProviderIntegration @default(NATIVE)
   /// Custo padrão repassado ao provedor (% GGR) — ex.: Salsa Studio 6.5%

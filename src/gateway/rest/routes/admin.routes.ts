@@ -384,6 +384,8 @@ router.patch("/games/:id", async (req, res) => {
     name: z.string().min(2).optional(),
     sortOrder: z.number().int().optional(),
     aggregatorFeePct: z.number().min(0).max(50).optional(),
+    thumbnailUrl: z.string().url().max(2048).nullable().optional(),
+    externalUrl: z.string().url().max(2048).nullable().optional(),
   });
 
   const parsed = patchSchema.safeParse(req.body);
@@ -456,6 +458,7 @@ router.post("/providers", async (req, res) => {
     name: string;
     integration?: "NATIVE" | "SALSA" | "DIRECT";
     defaultCostPct?: number;
+    logoUrl?: string | null;
     isActive?: boolean;
   };
   const provider = await prisma.gameProvider.create({
@@ -464,6 +467,7 @@ router.post("/providers", async (req, res) => {
       name: body.name,
       integration: body.integration ?? "NATIVE",
       defaultCostPct: body.defaultCostPct ?? null,
+      logoUrl: body.logoUrl?.trim() || null,
       isActive: body.isActive ?? true,
     },
   });
@@ -477,10 +481,24 @@ router.patch("/providers/:id", async (req, res) => {
     return;
   }
 
-  const { isActive, name, displayName, defaultCostPct, integration } = req.body as {
+  const parsed = z.object({
+    isActive: z.boolean().optional(),
+    name: z.string().min(1).optional(),
+    displayName: z.string().max(120).nullable().optional(),
+    logoUrl: z.string().url().max(2048).nullable().optional(),
+    defaultCostPct: z.number().min(0).max(50).nullable().optional(),
+    integration: z.enum(["NATIVE", "SALSA", "DIRECT"]).optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const { isActive, name, displayName, logoUrl, defaultCostPct, integration } = parsed.data as {
     isActive?: boolean;
     name?: string;
     displayName?: string | null;
+    logoUrl?: string | null;
     defaultCostPct?: number | null;
     integration?: "NATIVE" | "SALSA" | "DIRECT";
   };
@@ -493,6 +511,7 @@ router.patch("/providers/:id", async (req, res) => {
       ...(isActive !== undefined && { isActive }),
       ...(name !== undefined && { name }),
       ...(displayName !== undefined && { displayName: displayName?.trim() || null }),
+      ...(logoUrl !== undefined && { logoUrl: logoUrl?.trim() || null }),
       ...(defaultCostPct !== undefined && { defaultCostPct }),
       ...(integration !== undefined && { integration }),
     },
@@ -507,6 +526,28 @@ router.patch("/providers/:id", async (req, res) => {
   }
 
   res.json(serializeBigInt(provider));
+});
+
+router.get("/providers/:id/games", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid provider id" });
+    return;
+  }
+  const provider = await prisma.gameProvider.findUnique({
+    where: { id },
+    include: { _count: { select: { games: true } } },
+  });
+  if (!provider) {
+    res.status(404).json({ error: "Provider not found" });
+    return;
+  }
+  const games = await prisma.game.findMany({
+    where: { providerId: id },
+    include: { category: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+  res.json(serializeBigInt({ provider, count: games.length, games }));
 });
 
 router.post("/providers/:id/toggle-games", async (req, res) => {
