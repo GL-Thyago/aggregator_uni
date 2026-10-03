@@ -23,7 +23,7 @@ function parseBound(query?: string, asEnd = false): Date | undefined {
   if (!raw) return undefined;
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     const [y, m, day] = raw.split("-").map(Number);
-    const d = new Date(y, m - 1, day);
+    const d = new Date(y!, m! - 1, day!);
     return asEnd ? endOfLocalDay(d) : startOfLocalDay(d);
   }
   const d = new Date(raw);

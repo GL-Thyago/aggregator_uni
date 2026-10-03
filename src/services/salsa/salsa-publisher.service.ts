@@ -754,7 +754,7 @@ export async function handleSalsaPublisherRequest(xml: string): Promise<string> 
     return salsaFailure("Unknown", "SALSA_HASH_KEY not configured.", "9001");
   }
 
-  activeHashKey = cfg.hashKey;
+  activeHashKey = cfg.hashKey ?? process.env.SALSA_HASH_KEY_LIVE;
   const parsed = parseSalsaRequest(xml);
   console.log(
     "[Salsa] Publisher",

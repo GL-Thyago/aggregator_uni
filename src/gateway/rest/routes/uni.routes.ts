@@ -65,8 +65,8 @@ async function launchInEnvironment(
       environment === "test" && pn ? uniGpiUrl(launch.sessionToken, pn) : undefined;
 
     res.json({
-      environment,
       ...launch,
+      environment,
       ...(gpiUrl ? { gpiUrl } : {}),
     });
   } catch (err) {

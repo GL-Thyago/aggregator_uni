@@ -97,9 +97,9 @@ export function toClientGameDto(g: GameWithRelations) {
     providerLogoUrl: g.provider.logoUrl ?? null,
     gameType: g.gameType,
     playMode: external ? ("external" as const) : ("embedded" as const),
-    ...(g.rtp !== undefined ? { rtp: decimalToString(g.rtp) } : {}),
-    ...(g.minBet !== undefined ? { minBet: decimalToString(g.minBet) } : {}),
-    ...(g.maxBet !== undefined ? { maxBet: decimalToString(g.maxBet) } : {}),
+    rtp: decimalToString(g.rtp),
+    minBet: decimalToString(g.minBet),
+    maxBet: decimalToString(g.maxBet),
   };
 }
 
@@ -134,6 +134,10 @@ export async function listGamesForClient(
       externalUrl: true,
       externalGameId: true,
       thumbnailUrl: true,
+      rtp: true,
+      minBet: true,
+      maxBet: true,
+      aggregatorFeePct: true,
       isFeatured: true,
       sortOrder: true,
       category: { select: { id: true, slug: true, name: true } },
@@ -163,6 +167,7 @@ export async function syncGamesForClient(clientId: string): Promise<SyncGamesRes
         providerId: g.providerId,
         providerSlug: g.provider.slug,
         providerName: dto.providerName,
+        providerLogoUrl: dto.providerLogoUrl,
         gameType: dto.gameType,
         engine: g.engine,
         launchUrl: buildLaunchUrl(g),

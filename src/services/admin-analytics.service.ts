@@ -6,7 +6,7 @@ function parseSince(query?: string | Date): Date {
     const raw = String(query).trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
       const [y, m, day] = raw.split("-").map(Number);
-      return new Date(y, m - 1, day, 0, 0, 0, 0);
+      return new Date(y!, m! - 1, day!, 0, 0, 0, 0);
     }
     const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) return d;
@@ -20,7 +20,7 @@ function parseUntil(query?: string | Date): Date | undefined {
   const raw = String(query).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     const [y, m, day] = raw.split("-").map(Number);
-    return new Date(y, m - 1, day, 23, 59, 59, 999);
+    return new Date(y!, m! - 1, day!, 23, 59, 59, 999);
   }
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return undefined;
