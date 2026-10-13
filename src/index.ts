@@ -6,6 +6,8 @@ import { startRestServer, stopRestServer } from "./gateway/rest/server.js";
 async function main(): Promise<void> {
   const { ensureSchemaPatches } = await import("./lib/prisma.js");
   await ensureSchemaPatches();
+  const { ensureProviderPortalPasswordFromEnv } = await import("./services/provider-portal-auth.service.js");
+  await ensureProviderPortalPasswordFromEnv();
   await connectRedis();
   startRestServer();
   console.log("[App] Casino aggregator started");

@@ -28,12 +28,8 @@ function sendIndex(dirName: string, res: express.Response) {
 }
 
 function mountStaticUi(app: express.Application, urlPath: string, dirName: string) {
-  // Sem barra no fim o browser pede /app.js na raiz (404/HTML) e o login morre.
-  // O redirect também descarta ?password= se o form submeter sem JS.
-  app.get(urlPath, (_req, res) => {
-    res.redirect(302, `${urlPath}/`);
-  });
-  app.get(`${urlPath}/`, (_req, res) => sendIndex(dirName, res));
+  // Com e sem barra: evita loop com proxy que normaliza a URL.
+  app.get([urlPath, `${urlPath}/`], (_req, res) => sendIndex(dirName, res));
   app.post([urlPath, `${urlPath}/`], (_req, res) => {
     res.redirect(303, `${urlPath}/`);
   });

@@ -4,19 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Portal de Provedores</title>
-  <base href="/provider-admin/">
   <script>
     (function () {
-      var p = location.pathname || "/";
-      var leaked = /[?&]password=/i.test(location.search || "");
-      if (p.slice(-1) !== "/" && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
-      if (leaked || p !== location.pathname) {
-        location.replace(p);
+      var path = location.pathname || "/";
+      var search = location.search || "";
+      if (/[?&]password=/i.test(search)) {
+        location.replace(path.replace(/\/?$/, "/"));
+        return;
+      }
+      if (!path.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(path)) {
+        location.replace(path + "/" + search + location.hash);
       }
     })();
   </script>
   <link rel="stylesheet" href="/aggregator-adm/styles.css">
-  <link rel="stylesheet" href="/provider-admin/styles.css?v=login-fix-2">
+  <link rel="stylesheet" href="/provider-admin/styles.css?v=login-fix-3">
 </head>
 <body>
   <div id="auth-screen" class="auth-screen">
@@ -80,7 +82,7 @@
       <div id="games-table" class="table-wrap"></div>
     </section>
   </main>
-  <script src="/provider-admin/app.js?v=login-fix-2"></script>
+  <script src="/provider-admin/app.js?v=login-fix-3"></script>
   <script>
     setTimeout(function () {
       if (window.__providerPortalReady) return;

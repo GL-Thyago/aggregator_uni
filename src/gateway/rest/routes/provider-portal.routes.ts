@@ -27,7 +27,10 @@ router.post("/auth/login", async (req, res) => {
   }
   const token = await authenticateProviderPortal(parsed.data.password);
   if (!token) {
-    res.status(401).json({ error: "Senha inválida" });
+    const configured = await isProviderPortalConfigured();
+    res.status(401).json({
+      error: configured ? "Senha inválida" : "Portal ainda sem senha. Defina PROVIDER_PORTAL_PASSWORD no EasyPanel ou use o Aggregator ADM.",
+    });
     return;
   }
   res.json({ token, expiresIn: "8h" });

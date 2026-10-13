@@ -23,6 +23,18 @@ export async function isProviderPortalConfigured() {
   return Boolean(await prisma.providerPortalConfig.findUnique({ where: { id: 1 }, select: { id: true } }));
 }
 
+/** Cria a senha do portal na 1ª subida se ainda não existir no banco. */
+export async function ensureProviderPortalPasswordFromEnv() {
+  if (await isProviderPortalConfigured()) return;
+  const password = env.PROVIDER_PORTAL_PASSWORD || env.ADMIN_API_KEY;
+  if (password.length < 8) {
+    console.warn("[ProviderPortal] Senha não configurada. Defina PROVIDER_PORTAL_PASSWORD ou use PUT /admin/v1/provider-portal/password");
+    return;
+  }
+  await setProviderPortalPassword(password);
+  console.log("[ProviderPortal] Senha inicial gravada a partir do ambiente");
+}
+
 export async function authenticateProviderPortal(password: string): Promise<string | null> {
   await ensureSchemaPatches();
   const config = await prisma.providerPortalConfig.findUnique({ where: { id: 1 } });
