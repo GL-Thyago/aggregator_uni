@@ -97,6 +97,28 @@ router.get("/media/cover/:slug", async (req, res) => {
   res.send("svg" in payload ? payload.svg : "");
 });
 
+router.get("/media/provider/:slug", async (req, res) => {
+  const { getProviderLogoPayload } = await import("../../../services/provider-logo.service.js");
+  const payload = await getProviderLogoPayload(decodeURIComponent(String(req.params.slug)));
+  if (!payload) {
+    res.status(404).end();
+    return;
+  }
+  if ("buffer" in payload && payload.buffer) {
+    res.set("Content-Type", payload.contentType);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.set("Cross-Origin-Resource-Policy", "cross-origin");
+    res.set("Access-Control-Allow-Origin", "*");
+    res.send(payload.buffer);
+    return;
+  }
+  if ("redirect" in payload && payload.redirect) {
+    res.redirect(302, payload.redirect);
+    return;
+  }
+  res.status(404).end();
+});
+
 router.get("/categories", authMiddleware, async (req: AuthenticatedRequest, res) => {
   const tree = await getEntitledGamesTree(req.client!.id);
   res.json(serializeBigInt(tree));
@@ -209,21 +231,26 @@ router.post("/session/spin", sessionMiddleware, async (req, res) => {
   }
 });
 
-router.get("/catalog/providers", authMiddleware, async (_req, res) => {
+router.get("/catalog/providers", authMiddleware, async (req: AuthenticatedRequest, res) => {
   const { resolveProviderLabel } = await import("../../../services/game.service.js");
-  const providers = await prisma.gameProvider.findMany({
-    where: { isActive: true },
-    orderBy: { name: "asc" },
-  });
-  res.json(
-    serializeBigInt(
-      providers.map((p) => ({
-        ...p,
-        name: resolveProviderLabel(p),
-        sourceName: p.name,
-      })),
-    ),
-  );
+  const { resolveProviderLogoUrl } = await import("../../../services/provider-logo.service.js");
+  const allowedGameIds = await getAllowedGameIds(req.client!.id);
+  const games = await listGamesForClient(req.client!.id, allowedGameIds);
+  const seen = new Map<
+    number,
+    { id: number; slug: string; name: string; sourceName: string; logoUrl: string | null }
+  >();
+  for (const g of games) {
+    if (seen.has(g.providerId)) continue;
+    seen.set(g.providerId, {
+      id: g.providerId,
+      slug: g.provider.slug,
+      name: resolveProviderLabel(g.provider),
+      sourceName: g.provider.name,
+      logoUrl: resolveProviderLogoUrl(g.provider),
+    });
+  }
+  res.json([...seen.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
 });
 
 router.get("/catalog/providers/:slug/games", authMiddleware, async (req: AuthenticatedRequest, res) => {

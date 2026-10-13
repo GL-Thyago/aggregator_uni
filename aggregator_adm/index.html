@@ -2,22 +2,38 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Aggregator ADM</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function () {
+      var p = location.pathname || "/";
+      if (p.slice(-1) !== "/" && !/\.[a-zA-Z0-9]+$/.test(p)) {
+        p += "/";
+        var b = document.createElement("base");
+        b.href = location.origin + p;
+        document.head.appendChild(b);
+        location.replace(p + location.search + location.hash);
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=login-fix-1">
 </head>
 <body>
   <div id="auth-screen" class="auth-screen">
-    <form id="auth-form" class="auth-card">
+    <form id="auth-form" class="auth-card" autocomplete="on">
       <h1>Aggregator ADM</h1>
       <p>Painel de operadores, saldos e analytics</p>
-      <label>Admin API Key</label>
-      <input id="admin-key-input" type="password" placeholder="X-Admin-Key" autocomplete="off">
-      <label>URL da API</label>
-      <input id="api-base-input" type="text" value="/admin/v1">
+      <input type="text" name="username" value="admin" autocomplete="username" tabindex="-1" aria-hidden="true" class="sr-only">
+      <label for="admin-key-input">Admin API Key</label>
+      <input id="admin-key-input" name="password" type="password" placeholder="ADMIN_API_KEY" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+      <details class="auth-advanced">
+        <summary>Opções avançadas</summary>
+        <label for="api-base-input">URL da API</label>
+        <input id="api-base-input" type="text" value="/admin/v1" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </details>
       <button type="submit">Entrar</button>
       <p id="auth-error" class="err-text"></p>
+      <noscript><p class="err-text">Ative o JavaScript para entrar no painel.</p></noscript>
     </form>
   </div>
 
@@ -319,8 +335,8 @@
           <div class="table-pager" id="salsa-games-pager"></div>
         </div>
         <div class="panel">
-          <h3>Provedores — nome no cassino e % Salsa</h3>
-          <p class="hint">O <strong>nome comercial</strong> é o que o cassino mostra. Vazio = usa o nome da API (ex.: Pgsoft_ZNT). A % do provedor é o padrão dos jogos dele — use “Aplicar %” para gravar em todos os títulos.</p>
+          <h3>Provedores — nome no cassino, banner e % Salsa</h3>
+          <p class="hint">O <strong>nome comercial</strong> é o que o cassino mostra. O <strong>banner</strong> é o logo do estúdio no lobby (URL ou arquivo). O sync da Salsa não apaga o banner. O cliente puxa no sync se marcar “banners”. Vazio = sem logo.</p>
           <div class="table-wrap" id="providers-table"></div>
         </div>
       </section>
@@ -346,6 +362,16 @@
     </main>
   </div>
 
-  <script src="app.js?v=reports-v2"></script>
+  <script src="app.js?v=login-fix-1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" async></script>
+  <script>
+    setTimeout(function () {
+      if (window.__admReady) return;
+      var el = document.getElementById("auth-error");
+      if (el && !el.textContent) {
+        el.textContent = "O painel não carregou neste aparelho. Abra o endereço com barra no final (ex.: /provider-admin/) e atualize sem cache.";
+      }
+    }, 2500);
+  </script>
 </body>
 </html>

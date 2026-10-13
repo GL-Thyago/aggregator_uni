@@ -192,7 +192,7 @@ model GameProvider {
   name           String
   /// Nome no cassino. Null = usa `name`. O sync não sobrescreve.
   displayName    String?             @map("display_name")
-  /// Logo/capa do provedor exibida no catálogo dos cassinos.
+  /// Banner/logo do estúdio no catálogo dos cassinos. O sync Salsa não sobrescreve.
   logoUrl        String?             @map("logo_url")
   isActive       Boolean             @default(true) @map("is_active")
   integration    ProviderIntegration @default(NATIVE)

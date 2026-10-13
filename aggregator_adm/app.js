@@ -1,9 +1,28 @@
 const LS_KEY = "aggregator_adm_key";
 const LS_BASE = "aggregator_adm_base";
 
+function lsGet(k) {
+  try { return localStorage.getItem(k); } catch { return null; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem(k, v); } catch { /* Safari privado / WebView */ }
+}
+function lsDel(k) {
+  try { localStorage.removeItem(k); } catch { /* ignore */ }
+}
+
+function normalizeApiBase(raw) {
+  const v = String(raw || "").trim();
+  if (!v || !/^(\/|https?:\/\/)/i.test(v)) return "/admin/v1";
+  if (/localhost|127\.0\.0\.1/i.test(v) && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
+    return "/admin/v1";
+  }
+  return v.replace(/\/+$/, "") || "/admin/v1";
+}
+
 const state = {
-  adminKey: localStorage.getItem(LS_KEY) || "",
-  apiBase: localStorage.getItem(LS_BASE) || "/admin/v1",
+  adminKey: lsGet(LS_KEY) || "",
+  apiBase: normalizeApiBase(lsGet(LS_BASE) || "/admin/v1"),
   clients: [],
   games: [],
   categories: [],
@@ -12,7 +31,7 @@ const state = {
   salsaGamesPage: 1,
   billingSpinsPage: 1,
   billingReport: null,
-  reportMode: localStorage.getItem("aggregator_adm_report_mode") || "internal",
+  reportMode: lsGet("aggregator_adm_report_mode") || "internal",
   charts: {},
 };
 
@@ -156,15 +175,25 @@ function parseSalsaPackText(raw) {
 }
 
 async function api(path, opts = {}) {
-  const res = await fetch(state.apiBase + path, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Admin-Key": state.adminKey,
-      Authorization: "Bearer " + state.adminKey,
-      ...(opts.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(state.apiBase + path, {
+      cache: "no-store",
+      ...opts,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Key": state.adminKey,
+        Authorization: "Bearer " + state.adminKey,
+        ...(opts.headers || {}),
+      },
+    });
+  } catch (err) {
+    throw new Error(
+      "Sem conexão com a API. Confirme que a URL é /admin/v1 e que o aparelho tem internet. (" +
+        (err && err.message ? err.message : "Failed to fetch") +
+        ")",
+    );
+  }
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
@@ -188,6 +217,16 @@ function destroyChart(id) {
     state.charts[id].destroy();
     delete state.charts[id];
   }
+}
+
+function drawChart(id, canvas, config, tries = 0) {
+  destroyChart(id);
+  if (!canvas) return;
+  if (typeof Chart === "undefined") {
+    if (tries < 20) setTimeout(() => drawChart(id, canvas, config, tries + 1), 300);
+    return;
+  }
+  state.charts[id] = new Chart(canvas, config);
 }
 
 function setView(name) {
@@ -276,8 +315,7 @@ async function loadDashboard() {
     renderOverviewCards(overview);
     renderClientMovement(movement);
 
-    destroyChart("timeseries");
-    state.charts.timeseries = new Chart($("#chart-timeseries"), {
+    drawChart("timeseries", $("#chart-timeseries"), {
       type: "line",
       data: {
         labels: timeseries.map((d) => d.date.slice(5)),
@@ -290,8 +328,7 @@ async function loadDashboard() {
       options: { responsive: true, plugins: { legend: { labels: { color: "#eef1f7" } } }, scales: { x: { ticks: { color: "#8b93a7" } }, y: { ticks: { color: "#8b93a7" } } } },
     });
 
-    destroyChart("topGames");
-    state.charts.topGames = new Chart($("#chart-top-games"), {
+    drawChart("topGames", $("#chart-top-games"), {
       type: "bar",
       data: {
         labels: topGames.map((g) => g.name),
@@ -907,7 +944,7 @@ function renderProviderCostControls(providers) {
   }
   if (emptyHint) emptyHint.hidden = providers.length > 0;
 
-  const providersHtml = providers.length ? `<table>
+  const costHtml = providers.length ? `<table>
       <thead><tr>
         <th>API / slug</th><th>Nome comercial</th><th>% Salsa</th><th>Jogos</th><th>Status</th><th>Ações</th>
       </tr></thead>
@@ -926,8 +963,28 @@ function renderProviderCostControls(providers) {
         </tr>`).join("")}
       </tbody></table>` : "<p class='hint'>Nenhum provedor ainda. Importa o código Salsa (ex.: 46) no bloco abaixo.</p>";
 
-  setHtml("#providers-cost-table", providersHtml);
-  setHtml("#providers-table", providersHtml);
+  const bannersHtml = providers.length ? `<table>
+      <thead><tr>
+        <th>Provedor</th><th>Nome comercial</th><th>Banner do lobby</th><th>Ações</th>
+      </tr></thead>
+      <tbody>${providers.map((p) => `
+        <tr data-provider-id="${p.id}" data-logo-url="${p.logoUrl ?? ""}">
+          <td><strong>${p.displayName || p.name}</strong><br><small>${p.slug}</small></td>
+          <td><input class="prov-display-name" type="text" value="${p.displayName ?? ""}" placeholder="${p.name}"></td>
+          <td>
+            ${p.logoUrl ? `<img class="prov-logo-preview" src="${p.logoUrl}" alt="" style="width:88px;height:48px;object-fit:contain;background:#111;border-radius:6px;display:block;margin-bottom:6px">` : `<div class="hint" style="margin:0 0 6px">Sem banner</div>`}
+            <input class="prov-logo-url" type="url" value="${p.logoUrl && /^https?:/i.test(p.logoUrl) ? p.logoUrl : ""}" placeholder="https://.../logo.png">
+            <input class="prov-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="margin-top:4px;max-width:180px">
+          </td>
+          <td>
+            <button class="ghost btn-save-provider-banner">Salvar banner</button>
+            <button class="ghost btn-clear-provider-banner">Limpar</button>
+          </td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Nenhum provedor ainda. Importa o código Salsa (ex.: 46) no bloco abaixo.</p>";
+
+  setHtml("#providers-cost-table", costHtml);
+  setHtml("#providers-table", bannersHtml);
 }
 
 function bindProviderTableActions() {
@@ -943,6 +1000,45 @@ function bindProviderTableActions() {
           displayName: displayName || null,
           ...(Number.isFinite(defaultCostPct) ? { defaultCostPct } : { defaultCostPct: null }),
         }),
+      });
+      loadIntegrationsView();
+    }));
+
+    $$(".btn-save-provider-banner").forEach((btn) => btn.addEventListener("click", async () => {
+      const row = btn.closest("tr");
+      const id = row.dataset.providerId;
+      const displayName = row.querySelector(".prov-display-name").value.trim();
+      const logoUrl = row.querySelector(".prov-logo-url")?.value.trim() || "";
+      const file = row.querySelector(".prov-logo-file")?.files?.[0];
+      await api(`/providers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          displayName: displayName || null,
+          ...(logoUrl ? { logoUrl } : {}),
+        }),
+      });
+      if (file) {
+        const imageDataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Falha ao ler o arquivo"));
+          reader.readAsDataURL(file);
+        });
+        await api(`/providers/${id}/logo`, {
+          method: "POST",
+          body: JSON.stringify({ imageDataUrl }),
+        });
+      }
+      loadIntegrationsView();
+    }));
+
+    $$(".btn-clear-provider-banner").forEach((btn) => btn.addEventListener("click", async () => {
+      const row = btn.closest("tr");
+      const id = row.dataset.providerId;
+      if (!confirm("Remover o banner deste provedor?")) return;
+      await api(`/providers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ logoUrl: null }),
       });
       loadIntegrationsView();
     }));
@@ -1057,12 +1153,14 @@ async function enterApp() {
 }
 
 function initAuth() {
-  $("#api-base-input").value = state.apiBase;
+  window.__admReady = true;
+  const apiInput = $("#api-base-input");
+  if (apiInput) apiInput.value = state.apiBase;
   if (state.adminKey) {
     api("/session")
       .then(() => enterApp())
       .catch((err) => {
-        localStorage.removeItem(LS_KEY);
+        lsDel(LS_KEY);
         state.adminKey = "";
         showLogin(err.message);
       });
@@ -1071,12 +1169,17 @@ function initAuth() {
   $("#auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     state.adminKey = $("#admin-key-input").value.trim().replace(/^['"]+|['"]+$/g, "");
-    state.apiBase = $("#api-base-input").value.trim() || "/admin/v1";
+    state.apiBase = normalizeApiBase($("#api-base-input")?.value || "/admin/v1");
+    if (apiInput) apiInput.value = state.apiBase;
     $("#auth-error").textContent = "";
+    if (!state.adminKey) {
+      showLogin("Cole a ADMIN_API_KEY do EasyPanel.");
+      return;
+    }
     try {
       await api("/session");
-      localStorage.setItem(LS_KEY, state.adminKey);
-      localStorage.setItem(LS_BASE, state.apiBase);
+      lsSet(LS_KEY, state.adminKey);
+      lsSet(LS_BASE, state.apiBase);
       await enterApp();
     } catch (err) {
       showLogin(err.message);
@@ -1084,7 +1187,7 @@ function initAuth() {
   });
 
   $("#logout-btn").addEventListener("click", () => {
-    localStorage.removeItem(LS_KEY);
+    lsDel(LS_KEY);
     location.reload();
   });
 }
@@ -1109,7 +1212,7 @@ function initUi() {
     reportMode.value = state.reportMode || "internal";
     reportMode.addEventListener("change", () => {
       state.reportMode = reportMode.value;
-      localStorage.setItem("aggregator_adm_report_mode", state.reportMode);
+      lsSet("aggregator_adm_report_mode", state.reportMode);
       syncReportModeHint();
       if ($(".nav.active")?.dataset.view === "revenue") loadRevenueView();
     });
@@ -1559,4 +1662,10 @@ async function bootstrap() {
   }
 }
 
-initAuth();
+try {
+  initAuth();
+} catch (err) {
+  window.__admReady = true;
+  const el = document.getElementById("auth-error");
+  if (el) el.textContent = "Erro ao iniciar o painel: " + (err && err.message ? err.message : err);
+}

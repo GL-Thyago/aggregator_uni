@@ -6,6 +6,7 @@ games/
 *.log
 .DS_Store
 data/covers/
+data/provider-logos/
 data/salsa-catalog-cache.json
 tools/cloudflared.exe
 

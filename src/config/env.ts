@@ -15,6 +15,11 @@ const envSchema = z.object({
     .string()
     .min(8)
     .transform((v) => v.trim().replace(/^['"]+|['"]+$/g, "")),
+  /** Senha do /provider-admin. Vazio = usa ADMIN_API_KEY. */
+  PROVIDER_PORTAL_PASSWORD: z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "").trim().replace(/^['"]+|['"]+$/g, "")),
 
   GAMES_DIR: z.string().default("./games"),
   PUBLIC_BASE_URL: z.string().default("http://localhost:3010"),

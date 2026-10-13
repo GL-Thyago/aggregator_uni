@@ -2,21 +2,34 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Portal de Provedores</title>
+  <base href="/provider-admin/">
+  <script>
+    (function () {
+      var p = location.pathname || "/";
+      var leaked = /[?&]password=/i.test(location.search || "");
+      if (p.slice(-1) !== "/" && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
+      if (leaked || p !== location.pathname) {
+        location.replace(p);
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/aggregator-adm/styles.css">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/provider-admin/styles.css?v=login-fix-2">
 </head>
 <body>
   <div id="auth-screen" class="auth-screen">
-    <form id="login-form" class="auth-card">
+    <form id="login-form" class="auth-card" method="post" action="/provider-admin/" autocomplete="on">
       <h1>Portal de Provedores</h1>
       <p>Acesso separado para comissão Salsa e imagens.</p>
-      <label>Senha deste portal
-        <input name="password" type="password" minlength="8" autocomplete="current-password" required>
+      <input type="text" name="username" value="provider" autocomplete="username" tabindex="-1" aria-hidden="true" class="sr-only">
+      <label for="portal-password">Senha deste portal
+        <input id="portal-password" name="password" type="password" minlength="8" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" required>
       </label>
       <button type="submit">Entrar</button>
       <p id="login-error" class="err-text"></p>
+      <noscript><p class="err-text">Ative o JavaScript para entrar.</p></noscript>
     </form>
   </div>
 
@@ -67,6 +80,15 @@
       <div id="games-table" class="table-wrap"></div>
     </section>
   </main>
-  <script src="app.js"></script>
+  <script src="/provider-admin/app.js?v=login-fix-2"></script>
+  <script>
+    setTimeout(function () {
+      if (window.__providerPortalReady) return;
+      var el = document.getElementById("login-error");
+      if (el && !el.textContent) {
+        el.textContent = "O painel não carregou. Abra https://rggames.site/provider-admin/ e atualize sem cache.";
+      }
+    }, 2500);
+  </script>
 </body>
 </html>

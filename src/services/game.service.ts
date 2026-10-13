@@ -2,6 +2,7 @@ import path from "node:path";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { decimalToString } from "../lib/utils.js";
+import { resolveProviderLogoUrl } from "./provider-logo.service.js";
 import type { SyncGamesResponse } from "../types/index.js";
 
 type GameWithRelations = {
@@ -94,7 +95,8 @@ export function toClientGameDto(g: GameWithRelations) {
     providerName: resolveProviderLabel(g.provider),
     providerSlug: g.provider.slug,
     providerSourceName: g.provider.name,
-    providerLogoUrl: g.provider.logoUrl ?? null,
+    providerLogoUrl: resolveProviderLogoUrl(g.provider),
+    providerLogo: resolveProviderLogoUrl(g.provider),
     gameType: g.gameType,
     playMode: external ? ("external" as const) : ("embedded" as const),
     rtp: decimalToString(g.rtp),
@@ -172,6 +174,7 @@ export async function syncGamesForClient(clientId: string): Promise<SyncGamesRes
         engine: g.engine,
         launchUrl: buildLaunchUrl(g),
         thumbnailUrl: dto.thumbnailUrl,
+        providerLogo: dto.providerLogo,
         rtp: dto.rtp,
         minBet: dto.minBet,
         maxBet: dto.maxBet,

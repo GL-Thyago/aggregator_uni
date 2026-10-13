@@ -23,7 +23,30 @@ function sendIndex(dirName: string, res: express.Response) {
     res.status(404).type("text/plain").send(`Não achei ${dirName}/index.html em ${repoRoot}`);
     return;
   }
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile(index);
+}
+
+function mountStaticUi(app: express.Application, urlPath: string, dirName: string) {
+  // Sem barra no fim o browser pede /app.js na raiz (404/HTML) e o login morre.
+  // O redirect também descarta ?password= se o form submeter sem JS.
+  app.get(urlPath, (_req, res) => {
+    res.redirect(302, `${urlPath}/`);
+  });
+  app.get(`${urlPath}/`, (_req, res) => sendIndex(dirName, res));
+  app.post([urlPath, `${urlPath}/`], (_req, res) => {
+    res.redirect(303, `${urlPath}/`);
+  });
+  app.use(
+    urlPath,
+    express.static(path.join(repoRoot, dirName), {
+      setHeaders(res, filePath) {
+        if (/\.(html|js|css)$/i.test(filePath)) {
+          res.setHeader("Cache-Control", "no-store");
+        }
+      },
+    }),
+  );
 }
 
 export function createRestServer(): express.Application {
@@ -35,8 +58,8 @@ export function createRestServer(): express.Application {
       allowedHeaders: ["Content-Type", "X-Admin-Key", "Authorization", "X-Api-Key", "X-Session-Token"],
     }),
   );
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: "8mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 
   const docsUni = path.join(repoRoot, "docs", "uni");
   app.get("/docs/uni/download/:file", (req, res) => {
@@ -61,15 +84,9 @@ export function createRestServer(): express.Application {
     res.redirect(302, "/docs/uni/");
   });
 
-  app.get("/aggregator-adm", (_req, res) => sendIndex("aggregator_adm", res));
-  app.get("/aggregator-adm/", (_req, res) => sendIndex("aggregator_adm", res));
-  app.use("/aggregator-adm", express.static(path.join(repoRoot, "aggregator_adm")));
-  app.get("/provider-admin", (_req, res) => sendIndex("provider_adm", res));
-  app.get("/provider-admin/", (_req, res) => sendIndex("provider_adm", res));
-  app.use("/provider-admin", express.static(path.join(repoRoot, "provider_adm")));
-  app.get("/admin-panel", (_req, res) => sendIndex("admin", res));
-  app.get("/admin-panel/", (_req, res) => sendIndex("admin", res));
-  app.use("/admin-panel", express.static(path.join(repoRoot, "admin")));
+  mountStaticUi(app, "/aggregator-adm", "aggregator_adm");
+  mountStaticUi(app, "/provider-admin", "provider_adm");
+  mountStaticUi(app, "/admin-panel", "admin");
 
   /** Compat: jogos Construct3 simple-php ainda chamam POST .../api/index.php (cache SW antigo) */
   app.post("/games/:slug/api/index.php", (req, res, next) => {
@@ -137,6 +154,7 @@ export function startRestServer(): void {
     console.log(`[REST] Admin API: http://localhost:${env.PORT}/admin/v1`);
     console.log(`[REST] Admin UI:  http://localhost:${env.PORT}/admin-panel/  (${path.join(repoRoot, "admin")})`);
     console.log(`[REST] Aggregator ADM: http://localhost:${env.PORT}/aggregator-adm/  (${path.join(repoRoot, "aggregator_adm")})`);
+    console.log(`[REST] Provider admin: http://localhost:${env.PORT}/provider-admin/`);
     console.log(`[REST] Salsa Publisher: http://localhost:${env.PORT}/api/v1/salsa/publisher`);
     console.log(`[REST] Games: http://localhost:${env.PORT}/games/ (dir: ${path.resolve(env.GAMES_DIR)})`);
     void import("../../services/salsa/salsa-sync.service.js")

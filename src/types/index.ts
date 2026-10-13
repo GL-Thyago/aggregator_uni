@@ -39,6 +39,7 @@ export interface SyncGamesResponse {
     engine: string;
     launchUrl: string;
     thumbnailUrl: string | null;
+    providerLogo: string | null;
     rtp: string | null;
     minBet: string | null;
     maxBet: string | null;

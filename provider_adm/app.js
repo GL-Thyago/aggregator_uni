@@ -1,8 +1,20 @@
 const TOKEN_KEY = "provider_portal_token";
 const API_BASE = "/provider/v1";
 
+function lsGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* Safari privado */ }
+}
+function lsDel(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
+
+window.__providerPortalReady = true;
+
 const state = {
-  token: localStorage.getItem(TOKEN_KEY) || "",
+  token: lsGet(TOKEN_KEY) || "",
   providers: [],
   providerId: "",
   storageConfigured: false,
@@ -27,14 +39,20 @@ function showError(message = "") {
 
 async function api(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(API_BASE + path, {
-    ...options,
+  let response;
+  try {
+    response = await fetch(API_BASE + path, {
+      cache: "no-store",
+      ...options,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
       ...(options.headers || {}),
     },
-  });
+    });
+  } catch {
+    throw new Error("Sem conexão com o portal. Confirme a internet e tente de novo.");
+  }
   const text = await response.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
@@ -46,7 +64,7 @@ async function api(path, options = {}) {
 }
 
 function logout() {
-  localStorage.removeItem(TOKEN_KEY);
+  lsDel(TOKEN_KEY);
   state.token = "";
   $("#portal").classList.add("hidden");
   $("#auth-screen").classList.remove("hidden");
@@ -161,7 +179,7 @@ $("#login-form").addEventListener("submit", async (event) => {
       body: JSON.stringify({ password: event.target.password.value }),
     });
     state.token = result.token;
-    localStorage.setItem(TOKEN_KEY, state.token);
+    lsSet(TOKEN_KEY, state.token);
     event.target.reset();
     await enterPortal();
   } catch (error) {

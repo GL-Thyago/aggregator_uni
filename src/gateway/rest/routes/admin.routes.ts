@@ -518,14 +518,7 @@ router.patch("/providers/:id", async (req, res) => {
     return;
   }
 
-  const { isActive, name, displayName, logoUrl, defaultCostPct, integration } = parsed.data as {
-    isActive?: boolean;
-    name?: string;
-    displayName?: string | null;
-    logoUrl?: string | null;
-    defaultCostPct?: number | null;
-    integration?: "NATIVE" | "SALSA" | "DIRECT";
-  };
+  const { isActive, name, displayName, logoUrl, defaultCostPct, integration } = parsed.data;
 
   const cascadeGames = req.query.cascadeGames === "1" || req.query.cascadeGames === "true";
 
@@ -572,6 +565,38 @@ router.get("/providers/:id/games", async (req, res) => {
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   res.json(serializeBigInt({ provider, count: games.length, games }));
+});
+
+router.post("/providers/:id/logo", async (req, res) => {
+  await ensureSchemaPatches();
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid provider id" });
+    return;
+  }
+  const provider = await prisma.gameProvider.findUnique({ where: { id } });
+  if (!provider) {
+    res.status(404).json({ error: "Provider not found" });
+    return;
+  }
+
+  const body = req.body as { imageDataUrl?: string; logoUrl?: string | null };
+  try {
+    if (typeof body.imageDataUrl === "string" && body.imageDataUrl.startsWith("data:image/")) {
+      const { saveProviderLogoUpload } = await import("../../../services/provider-logo.service.js");
+      const updated = await saveProviderLogoUpload(id, provider.slug, body.imageDataUrl);
+      res.json(serializeBigInt(updated));
+      return;
+    }
+    const logoUrl = typeof body.logoUrl === "string" ? body.logoUrl.trim() || null : null;
+    const updated = await prisma.gameProvider.update({
+      where: { id },
+      data: { logoUrl },
+    });
+    res.json(serializeBigInt(updated));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Falha ao gravar banner" });
+  }
 });
 
 router.post("/providers/:id/toggle-games", async (req, res) => {
