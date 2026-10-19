@@ -54,6 +54,8 @@ const envSchema = z.object({
   /** Bucket persistente para logos de provedores e capas de jogos. */
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().default("us-east-1"),
+  /** Pasta no bucket (ex.: aggregator/games/123/uuid.jpg). Compat: AWS_MEDIA_PREFIX. */
+  S3_MEDIA_PREFIX: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),
   S3_PUBLIC_BASE_URL: z.string().url().optional(),
   S3_FORCE_PATH_STYLE: z
@@ -65,12 +67,24 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 function loadEnv(): Env {
-  const parsed = envSchema.safeParse(process.env);
+  const merged = { ...process.env };
+  if (!merged.S3_BUCKET?.trim() && merged.AWS_BUCKET?.trim()) {
+    merged.S3_BUCKET = merged.AWS_BUCKET.trim();
+  }
+  if (!merged.S3_REGION?.trim() && merged.AWS_DEFAULT_REGION?.trim()) {
+    merged.S3_REGION = merged.AWS_DEFAULT_REGION.trim();
+  }
+  const mediaPrefix = merged.S3_MEDIA_PREFIX?.trim() || merged.AWS_MEDIA_PREFIX?.trim();
+  if (mediaPrefix) merged.S3_MEDIA_PREFIX = mediaPrefix;
+
+  const parsed = envSchema.safeParse(merged);
   if (!parsed.success) {
     console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
     process.exit(1);
   }
-  return parsed.data;
+  const data = parsed.data;
+  const prefix = (data.S3_MEDIA_PREFIX || "aggregator").replace(/^\/+|\/+$/g, "");
+  return { ...data, S3_MEDIA_PREFIX: prefix };
 }
 
 export const env = loadEnv();

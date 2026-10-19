@@ -37,6 +37,16 @@ export function isCatalogImageStorageConfigured() {
   return Boolean(env.S3_BUCKET);
 }
 
+export function getCatalogImageStorageInfo() {
+  return {
+    configured: isCatalogImageStorageConfigured(),
+    bucket: env.S3_BUCKET ?? null,
+    mediaPrefix: env.S3_MEDIA_PREFIX || "aggregator",
+    region: env.S3_REGION,
+    publicBaseUrl: env.S3_PUBLIC_BASE_URL ?? null,
+  };
+}
+
 export async function uploadCatalogImage(input: {
   buffer: Buffer;
   contentType: string;
@@ -46,7 +56,8 @@ export async function uploadCatalogImage(input: {
   const extension = EXTENSIONS[input.contentType];
   if (!extension) throw new Error("Formato inválido. Envie PNG, JPG, WEBP ou GIF.");
 
-  const key = `provider-catalog/${input.scope}/${input.entityId}/${crypto.randomUUID()}.${extension}`;
+  const prefix = (env.S3_MEDIA_PREFIX || "aggregator").replace(/^\/+|\/+$/g, "");
+  const key = `${prefix}/${input.scope}/${input.entityId}/${crypto.randomUUID()}.${extension}`;
   await getClient().send(
     new PutObjectCommand({
       Bucket: env.S3_BUCKET!,

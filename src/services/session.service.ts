@@ -5,7 +5,7 @@ import { buildLaunchUrl, isExternalLaunchGame } from "./game.service.js";
 import { env } from "../config/env.js";
 import { buildSalsaLaunchUrl, isLocalHostname, salsaPublisherUrl } from "../config/salsa.js";
 import { UNI_SALSA, uniPn, type UniEnvironment } from "../config/uni.js";
-import { resolveSpinFees } from "./fee.service.js";
+import { resolveGgrFees } from "./fee.service.js";
 import { resolveClientGameFees } from "./client-game-fees.service.js";
 import { debitBet, creditWin, getWalletBalance } from "./player-wallet.service.js";
 import { debitClientFees } from "./client-wallet.service.js";
@@ -193,6 +193,11 @@ export async function processSpin(input: {
     throw new Error(`Bet must be between ${minBet} and ${maxBet}`);
   }
 
+  let winAmount = input.winAmount;
+  if (winAmount === undefined) {
+    throw new Error("winAmount required — use rtp-pool before processSpin");
+  }
+
   const feeBreakdown = await resolveClientGameFees({
     clientId: session.clientId,
     gameId: session.game.id,
@@ -201,16 +206,12 @@ export async function processSpin(input: {
     defaultProviderCostPct: Number(session.game.aggregatorFeePct),
     defaultClientMarginPct: Number(session.client.marginPct),
   });
-  const fees = resolveSpinFees({
+  const fees = resolveGgrFees({
     betAmount: input.betAmount,
-    gameFeePct: feeBreakdown.gameFeePct,
-    clientFeePct: feeBreakdown.clientFeePct,
+    winAmount,
+    providerCostPct: feeBreakdown.providerCostPct,
+    totalChargePct: feeBreakdown.totalChargePct,
   });
-
-  let winAmount = input.winAmount;
-  if (winAmount === undefined) {
-    throw new Error("winAmount required — use rtp-pool before processSpin");
-  }
 
   const spinId = crypto.randomUUID();
   const balanceBefore = await getWalletBalance(
@@ -296,6 +297,7 @@ export async function processSpin(input: {
     gameFeeAmount: fees.gameFeeAmount,
     clientFeeAmount: fees.clientFeeAmount,
     referenceId: spinId,
+    ggr: fees.ggr,
   });
 
   return {

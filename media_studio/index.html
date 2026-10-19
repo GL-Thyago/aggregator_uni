@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Studio — Capas dos jogos</title>
+  <link rel="stylesheet" href="/aggregator-adm/styles.css">
+  <link rel="stylesheet" href="/media-studio/styles.css?v=1">
+</head>
+<body>
+  <div id="auth-screen" class="auth-screen">
+    <form id="auth-form" class="auth-card" autocomplete="on">
+      <h1>Media Studio</h1>
+      <p>Capas dos jogos — link direto S3 ou upload. Mesma URL que os cassinos recebem na API.</p>
+      <input type="text" name="username" value="admin" autocomplete="username" tabindex="-1" aria-hidden="true" class="sr-only">
+      <label for="admin-key">Admin API Key</label>
+      <input id="admin-key" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+      <p id="auth-error" class="err-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="studio hidden">
+    <header class="studio-header">
+      <div>
+        <h1>Capas do catálogo</h1>
+        <p id="storage-hint" class="hint"></p>
+      </div>
+      <button id="logout" class="ghost">Sair</button>
+    </header>
+
+    <section class="panel filters">
+      <label>Buscar
+        <input id="search" type="search" placeholder="Nome, slug ou código Salsa">
+      </label>
+      <label>Provedor
+        <select id="provider-filter"><option value="">Todos</option></select>
+      </label>
+      <button id="btn-reload" class="ghost">Atualizar lista</button>
+    </section>
+
+    <p id="global-error" class="banner err hidden"></p>
+    <div id="grid" class="game-grid"></div>
+  </div>
+
+  <script src="/media-studio/app.js?v=1"></script>
+</body>
+</html>

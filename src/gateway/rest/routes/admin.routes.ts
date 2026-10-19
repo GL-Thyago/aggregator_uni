@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { ensureSchemaPatches, prisma } from "../../../lib/prisma.js";
 import { generateApiKey, hashApiKey, serializeBigInt } from "../../../lib/utils.js";
@@ -8,6 +9,10 @@ import { targetRtpFromGame } from "../../../config/rtp.js";
 import { resolveTargetRtpForClientGame } from "../../../services/client-game-config.service.js";
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
 
 router.use(async (_req, _res, next) => {
   await ensureSchemaPatches();
@@ -384,12 +389,62 @@ router.post("/games", async (req, res) => {
   res.status(201).json(serializeBigInt(game));
 });
 
-router.get("/games", async (_req, res) => {
+router.get("/media/storage", async (_req, res) => {
+  const { getCatalogImageStorageInfo } = await import("../../../services/catalog-image-storage.service.js");
+  res.json(getCatalogImageStorageInfo());
+});
+
+router.get("/games", async (req, res) => {
+  const search = String(req.query.search ?? "").trim();
+  const providerId = Number(req.query.providerId);
   const games = await prisma.game.findMany({
+    where: {
+      ...(Number.isInteger(providerId) && providerId > 0 ? { providerId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { slug: { contains: search, mode: "insensitive" } },
+              { externalGameId: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
     include: { category: true, provider: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    take: search || Number.isInteger(providerId) ? 500 : undefined,
   });
   res.json(serializeBigInt(games));
+});
+
+router.post("/games/:id/thumbnail", upload.single("image"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || !req.file) {
+    res.status(400).json({ error: "Jogo e arquivo de imagem são obrigatórios" });
+    return;
+  }
+  const game = await prisma.game.findUnique({ where: { id }, select: { id: true } });
+  if (!game) {
+    res.status(404).json({ error: "Game not found" });
+    return;
+  }
+  try {
+    const { uploadCatalogImage } = await import("../../../services/catalog-image-storage.service.js");
+    const thumbnailUrl = await uploadCatalogImage({
+      buffer: req.file.buffer,
+      contentType: req.file.mimetype,
+      scope: "games",
+      entityId: id,
+    });
+    const updated = await prisma.game.update({
+      where: { id },
+      data: { thumbnailUrl },
+      include: { category: true, provider: true },
+    });
+    res.status(201).json(serializeBigInt(updated));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Falha no upload" });
+  }
 });
 
 router.patch("/games/:id", async (req, res) => {

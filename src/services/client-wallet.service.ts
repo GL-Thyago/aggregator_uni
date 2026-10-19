@@ -64,15 +64,19 @@ async function assertCanDebit(clientId: string, balanceAfter: number) {
   }
 }
 
-/** Debita taxa B2B do operador — jogador final não vê isso */
+/**
+ * Liquida taxa B2B do operador (% sobre GGR, igual ao relatório).
+ * Valor negativo (GGR negativo / jogador ganhou) credita o pré-pago.
+ */
 export async function debitClientFees(input: {
   clientId: string;
   gameFeeAmount: number;
   clientFeeAmount: number;
   referenceId?: string;
+  ggr?: number;
 }) {
   const total = round(input.gameFeeAmount + input.clientFeeAmount);
-  if (total <= 0) {
+  if (total === 0) {
     return { debited: 0, balanceAfter: await getClientWalletBalance(input.clientId) };
   }
 
@@ -86,7 +90,9 @@ export async function debitClientFees(input: {
     const balanceBefore = Number(wallet.balance);
     const balanceAfter = round(balanceBefore - total);
 
-    await assertCanDebit(input.clientId, balanceAfter);
+    if (total > 0) {
+      await assertCanDebit(input.clientId, balanceAfter);
+    }
 
     await tx.clientWallet.update({
       where: { clientId: input.clientId },
@@ -95,15 +101,19 @@ export async function debitClientFees(input: {
 
     await logWalletTx(tx, {
       clientId: input.clientId,
-      type: "DEBIT_FEE",
+      type: total > 0 ? "DEBIT_FEE" : "ADJUST",
       amount: -total,
       balanceBefore,
       balanceAfter,
-      description: "Taxas de jogo + margem B2B",
+      description:
+        total > 0
+          ? "Taxa B2B (% sobre GGR)"
+          : "Estorno taxa B2B (GGR negativo no período da rodada)",
       referenceId: input.referenceId,
       metadata: {
         gameFeeAmount: input.gameFeeAmount,
         clientFeeAmount: input.clientFeeAmount,
+        ggr: input.ggr,
       },
     });
 

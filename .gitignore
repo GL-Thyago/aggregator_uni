@@ -1,4 +1,6 @@
 node_modules/
+adm_agregador/.next/
+media-studio-next/
 dist/
 generated/
 games/

@@ -82,6 +82,7 @@ export function createRestServer(): express.Application {
 
   mountStaticUi(app, "/aggregator-adm", "aggregator_adm");
   mountStaticUi(app, "/provider-admin", "provider_adm");
+  mountStaticUi(app, "/media-studio", "media_studio");
   mountStaticUi(app, "/admin-panel", "admin");
 
   /** Compat: jogos Construct3 simple-php ainda chamam POST .../api/index.php (cache SW antigo) */
@@ -151,6 +152,7 @@ export function startRestServer(): void {
     console.log(`[REST] Admin UI:  http://localhost:${env.PORT}/admin-panel/  (${path.join(repoRoot, "admin")})`);
     console.log(`[REST] Aggregator ADM: http://localhost:${env.PORT}/aggregator-adm/  (${path.join(repoRoot, "aggregator_adm")})`);
     console.log(`[REST] Provider admin: http://localhost:${env.PORT}/provider-admin/`);
+    console.log(`[REST] Media studio:  http://localhost:${env.PORT}/media-studio/`);
     console.log(`[REST] Salsa Publisher: http://localhost:${env.PORT}/api/v1/salsa/publisher`);
     console.log(`[REST] Games: http://localhost:${env.PORT}/games/ (dir: ${path.resolve(env.GAMES_DIR)})`);
     void import("../../services/salsa/salsa-sync.service.js")

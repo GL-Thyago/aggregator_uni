@@ -6,7 +6,7 @@ import {
   moneyToCents,
   validateSalsaHash,
 } from "../../config/salsa.js";
-import { resolveSpinFees } from "../fee.service.js";
+import { resolveGgrFees } from "../fee.service.js";
 import { resolveClientGameFees } from "../client-game-fees.service.js";
 import {
   creditWin,
@@ -114,6 +114,69 @@ function expiredError(method: string, balanceCents?: number, currency?: string) 
 function isInsufficientWalletError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /insufficient/i.test(msg);
+}
+
+async function findPlaceBetForRound(sessionId: string, gameReference?: string | null) {
+  const ref = gameReference?.trim() || undefined;
+  return prisma.salsaTransaction.findFirst({
+    where: {
+      sessionId,
+      kind: "PLACE_BET",
+      ...(ref ? { gameReference: ref } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+async function settleSalsaRoundClientFee(
+  session: {
+    id: string;
+    clientId: string;
+    game: {
+      id: number;
+      slug: string;
+      categoryId: number;
+      providerId: number;
+      aggregatorFeePct: unknown;
+    };
+    client: { marginPct: unknown };
+  },
+  betAmount: number,
+  winAmount: number,
+  referenceId: string,
+) {
+  const feeBreakdown = await resolveClientGameFees({
+    clientId: session.clientId,
+    gameId: session.game.id,
+    categoryId: session.game.categoryId,
+    providerId: session.game.providerId,
+    defaultProviderCostPct: Number(session.game.aggregatorFeePct),
+    defaultClientMarginPct: Number(session.client.marginPct),
+  });
+  const fees = resolveGgrFees({
+    betAmount,
+    winAmount,
+    providerCostPct: feeBreakdown.providerCostPct,
+    totalChargePct: feeBreakdown.totalChargePct,
+  });
+
+  if (fees.totalFeeAmount === 0) return fees;
+
+  const existing = await prisma.clientWalletTransaction.findFirst({
+    where: { clientId: session.clientId, referenceId },
+    select: { id: true },
+  });
+  if (existing) return fees;
+
+  await debitClientFees({
+    clientId: session.clientId,
+    gameFeeAmount: fees.gameFeeAmount,
+    clientFeeAmount: fees.clientFeeAmount,
+    referenceId,
+    ggr: fees.ggr,
+  });
+
+  return fees;
 }
 
 function sessionIsExpired(session: { expiresAt: Date; isActive: boolean }): boolean {
@@ -378,19 +441,6 @@ async function handlePlaceBet(params: Record<string, string>) {
     });
   }
 
-  const feeBreakdown = await resolveClientGameFees({
-    clientId: session.clientId,
-    gameId: session.game.id,
-    categoryId: session.game.categoryId,
-    providerId: session.game.providerId,
-    defaultProviderCostPct: Number(session.game.aggregatorFeePct),
-    defaultClientMarginPct: Number(session.client.marginPct),
-  });
-  const fees = resolveSpinFees({
-    betAmount,
-    gameFeePct: feeBreakdown.gameFeePct,
-    clientFeePct: feeBreakdown.clientFeePct,
-  });
   const spinId = crypto.randomUUID();
   const extNum = extTransactionNum(`${transactionId}:${referenceNum}:bet`);
 
@@ -406,10 +456,10 @@ async function handlePlaceBet(params: Record<string, string>) {
             gameSlug: session.game.slug,
             betAmount,
             winAmount: 0,
-            gameFeeAmount: fees.gameFeeAmount,
-            clientFeeAmount: fees.clientFeeAmount,
-            gameFeePct: fees.gameFeePct,
-            clientFeePct: fees.clientFeePct,
+            gameFeeAmount: 0,
+            clientFeeAmount: 0,
+            gameFeePct: 0,
+            clientFeePct: 0,
             spinId,
             sessionId: session.sessionToken,
             currency: session.currency,
@@ -443,10 +493,10 @@ async function handlePlaceBet(params: Record<string, string>) {
           sessionId: session.id,
           betAmount,
           winAmount: 0,
-          gameFeeAmount: fees.gameFeeAmount,
-          clientFeeAmount: fees.clientFeeAmount,
-          gameFeePct: fees.gameFeePct,
-          clientFeePct: fees.clientFeePct,
+          gameFeeAmount: 0,
+          clientFeeAmount: 0,
+          gameFeePct: 0,
+          clientFeePct: 0,
           balanceBefore: centsToMoney(balanceBefore),
           balanceAfter: centsToMoney(balanceAfterCents),
           externalTxId: `${transactionId}:${referenceNum}`,
@@ -470,15 +520,6 @@ async function handlePlaceBet(params: Record<string, string>) {
         data: { balance: centsToMoney(balanceAfterCents) },
       }),
     ]);
-
-    if (fees.totalFeeAmount > 0) {
-      await debitClientFees({
-        clientId: session.clientId,
-        gameFeeAmount: fees.gameFeeAmount,
-        clientFeeAmount: fees.clientFeeAmount,
-        referenceId: spinId,
-      });
-    }
   } catch (e) {
     if (isInsufficientWalletError(e)) {
       return salsaFailure("PlaceBet", "Insufficient funds", "6", {
@@ -538,10 +579,15 @@ async function handleAwardWinnings(params: Record<string, string>) {
   const extNum = extTransactionNum(`${transactionId}:${referenceNum}:win`);
   let balanceAfterCents = balanceBefore;
 
+  const linkedBet = await findPlaceBetForRound(session.id, params.GameReference);
+  const betAmount = linkedBet ? centsToMoney(linkedBet.amountCents) : 0;
+
   try {
     if (winAmount > 0) {
       balanceAfterCents = await applyWalletCredit(session, winAmount, spinId);
     }
+
+    const fees = await settleSalsaRoundClientFee(session, betAmount, winAmount, spinId);
 
     await prisma.$transaction([
       prisma.gameSpin.create({
@@ -550,6 +596,10 @@ async function handleAwardWinnings(params: Record<string, string>) {
           sessionId: session.id,
           betAmount: 0,
           winAmount,
+          gameFeeAmount: fees.gameFeeAmount,
+          clientFeeAmount: fees.clientFeeAmount,
+          gameFeePct: fees.gameFeePct,
+          clientFeePct: fees.clientFeePct,
           balanceBefore: centsToMoney(balanceBefore),
           balanceAfter: centsToMoney(balanceAfterCents),
           externalTxId: `${transactionId}:${referenceNum}`,
@@ -558,6 +608,8 @@ async function handleAwardWinnings(params: Record<string, string>) {
             type: "AwardWinnings",
             gameStatus: params.GameStatus,
             gameReference: params.GameReference,
+            linkedBetAmount: betAmount,
+            ggr: fees.ggr,
           },
         },
       }),
