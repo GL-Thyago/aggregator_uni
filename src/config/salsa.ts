@@ -99,6 +99,17 @@ export function extTransactionNum(seed: string): bigint {
   return 1_000_000_000_000n + n;
 }
 
+/** Id estável para wallet do operador (back_uni) — evita débito/crédito duplicado em retry Salsa. */
+export function salsaWalletSpinId(
+  kind: "bet" | "win" | "refund",
+  salsaTransactionId: string,
+  referenceNum: string,
+): string {
+  const seed = `${kind}|${salsaTransactionId}|${referenceNum}`;
+  const hex = crypto.createHash("sha256").update(seed).digest("hex").slice(0, 56);
+  return `sw_${hex}`;
+}
+
 export function centsToMoney(cents: number): number {
   return Math.round(cents) / 100;
 }

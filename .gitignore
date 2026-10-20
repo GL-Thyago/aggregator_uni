@@ -5,6 +5,8 @@ dist/
 generated/
 games/
 .env
+.env.aws-ready
+.env.paste-easypanel
 *.log
 .DS_Store
 data/covers/

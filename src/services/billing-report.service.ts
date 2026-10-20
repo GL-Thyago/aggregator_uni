@@ -349,6 +349,7 @@ export async function getBillingSpins(options: {
   since?: string;
   until?: string;
   clientId?: string;
+  externalUserId?: string;
   providerId?: number;
   page?: number;
   pageSize?: number;
@@ -363,6 +364,7 @@ export async function getBillingSpins(options: {
     createdAt: createdAtFilter(since, until),
     session: {
       ...(options.clientId && { clientId: options.clientId }),
+      ...(options.externalUserId && { externalUserId: options.externalUserId }),
       ...(options.providerId && { game: { providerId: options.providerId } }),
     },
   };
@@ -376,9 +378,12 @@ export async function getBillingSpins(options: {
         betAmount: true,
         winAmount: true,
         createdAt: true,
+        externalTxId: true,
+        result: true,
         session: {
           select: {
             clientId: true,
+            externalUserId: true,
             client: { select: { name: true } },
             game: {
               select: {
@@ -408,20 +413,102 @@ export async function getBillingSpins(options: {
       const bet = Number(s.betAmount);
       const win = Number(s.winAmount);
       const ggr = bet - win;
+      const result = s.result as Record<string, unknown> | null;
       return {
         id: s.id,
         at: s.createdAt.toISOString(),
         clientId: s.session.clientId,
         clientName: s.session.client.name,
+        externalUserId: s.session.externalUserId,
         game: s.session.game.name,
         slug: s.session.game.slug,
         provider: providerLabel(s.session.game.provider),
         providerId,
         betAmount: round2(bet),
         winAmount: round2(win),
+        externalTxId: s.externalTxId,
+        salsaKind: typeof result?.type === "string" ? result.type : null,
+        gameReference: typeof result?.gameReference === "string" ? result.gameReference : null,
         ...settleGgr(ggr, rates.salsaPct, rates.chargePct),
       };
     }),
+  };
+}
+
+/** Histórico Salsa por jogador (aposta / prêmio / estorno) — rastreio por rodada. */
+export async function getPlayerSalsaAudit(options: {
+  since?: string;
+  until?: string;
+  clientId?: string;
+  externalUserId?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const since = parseSince(options.since);
+  const until = parseUntil(options.until);
+  const pageSize = Math.min(200, Math.max(10, options.pageSize ?? 50));
+  const page = Math.max(1, options.page ?? 1);
+
+  const where = {
+    createdAt: createdAtFilter(since, until),
+    session: {
+      ...(options.clientId && { clientId: options.clientId }),
+      ...(options.externalUserId && { externalUserId: options.externalUserId }),
+    },
+  };
+
+  const [total, rows] = await Promise.all([
+    prisma.salsaTransaction.count({ where }),
+    prisma.salsaTransaction.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        kind: true,
+        amountCents: true,
+        gameReference: true,
+        salsaTransactionId: true,
+        referenceNum: true,
+        spinId: true,
+        createdAt: true,
+        session: {
+          select: {
+            externalUserId: true,
+            clientId: true,
+            game: {
+              select: {
+                name: true,
+                slug: true,
+                provider: { select: { displayName: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    page,
+    pageSize,
+    pages: Math.max(1, Math.ceil(total / pageSize)),
+    events: rows.map((r) => ({
+      at: r.createdAt.toISOString(),
+      kind: r.kind,
+      amount: round2(r.amountCents / 100),
+      externalUserId: r.session.externalUserId,
+      clientId: r.session.clientId,
+      game: r.session.game.name,
+      slug: r.session.game.slug,
+      provider: providerLabel(r.session.game.provider),
+      gameReference: r.gameReference,
+      walletSpinId: r.spinId,
+      salsaTransactionId: r.salsaTransactionId,
+      referenceNum: r.referenceNum,
+    })),
   };
 }
 

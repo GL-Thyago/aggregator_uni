@@ -4,6 +4,7 @@ import {
   centsToMoney,
   extTransactionNum,
   moneyToCents,
+  salsaWalletSpinId,
   validateSalsaHash,
 } from "../../config/salsa.js";
 import { resolveGgrFees } from "../fee.service.js";
@@ -441,7 +442,7 @@ async function handlePlaceBet(params: Record<string, string>) {
     });
   }
 
-  const spinId = crypto.randomUUID();
+  const spinId = salsaWalletSpinId("bet", transactionId, referenceNum);
   const extNum = extTransactionNum(`${transactionId}:${referenceNum}:bet`);
 
   const walletConfig = await getClientWalletConfig(session.clientId);
@@ -575,7 +576,7 @@ async function handleAwardWinnings(params: Record<string, string>) {
   }
 
   const winAmount = centsToMoney(winCents);
-  const spinId = crypto.randomUUID();
+  const spinId = salsaWalletSpinId("win", transactionId, referenceNum);
   const extNum = extTransactionNum(`${transactionId}:${referenceNum}:win`);
   let balanceAfterCents = balanceBefore;
 
@@ -680,7 +681,7 @@ async function handleRefundBet(params: Record<string, string>) {
 
   const originalBet = await findSalsaTx(transactionId, referenceNum, "PLACE_BET");
   const refundAmount = centsToMoney(refundCents);
-  const spinId = crypto.randomUUID();
+  const spinId = salsaWalletSpinId("refund", transactionId, referenceNum);
   const extNum = extTransactionNum(`${transactionId}:${referenceNum}:refund`);
   let balanceAfterCents = balanceBefore;
 

@@ -261,9 +261,24 @@ router.get("/billing/spins", async (req, res) => {
       since: req.query.since ? String(req.query.since) : undefined,
       until: req.query.until ? String(req.query.until) : undefined,
       clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      externalUserId: req.query.externalUserId ? String(req.query.externalUserId) : undefined,
       providerId: req.query.providerId ? Number(req.query.providerId) : undefined,
       page: req.query.page ? Number(req.query.page) : 1,
       pageSize: req.query.pageSize ? Number(req.query.pageSize) : 25,
+    }),
+  );
+});
+
+router.get("/billing/player-audit", async (req, res) => {
+  const { getPlayerSalsaAudit } = await import("../../../services/billing-report.service.js");
+  res.json(
+    await getPlayerSalsaAudit({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      externalUserId: req.query.externalUserId ? String(req.query.externalUserId) : undefined,
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : 50,
     }),
   );
 });
