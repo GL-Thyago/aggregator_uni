@@ -283,6 +283,57 @@ router.get("/billing/player-audit", async (req, res) => {
   );
 });
 
+router.get("/billing/players-summary", async (req, res) => {
+  const { getPlayersMovementSummary } = await import("../../../services/player-movement.service.js");
+  res.json(
+    await getPlayersMovementSummary({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : 150,
+    }),
+  );
+});
+
+router.get("/billing/player-detail", async (req, res) => {
+  const clientId = String(req.query.clientId ?? "").trim();
+  const externalUserId = String(req.query.externalUserId ?? "").trim();
+  if (!clientId || !externalUserId) {
+    return res.status(400).json({ error: "clientId e externalUserId obrigatórios" });
+  }
+  const { getPlayerMovementDetail } = await import("../../../services/player-movement.service.js");
+  res.json(
+    await getPlayerMovementDetail({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId,
+      externalUserId,
+    }),
+  );
+});
+
+router.get("/billing/integrity-check", async (req, res) => {
+  const { getWalletIntegrityReport } = await import("../../../services/player-movement.service.js");
+  res.json(
+    await getWalletIntegrityReport({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+    }),
+  );
+});
+
+router.get("/billing/payment-forensics", async (req, res) => {
+  const { getPaymentForensicsReport } = await import("../../../services/payment-forensics.service.js");
+  res.json(
+    await getPaymentForensicsReport({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+    }),
+  );
+});
+
 router.get("/billing/export", async (req, res) => {
   const since = req.query.since ? String(req.query.since) : undefined;
   const until = req.query.until ? String(req.query.until) : undefined;

@@ -233,13 +233,24 @@ function setView(name) {
   $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $$(".view").forEach((v) => v.classList.add("hidden"));
   $("#view-" + name).classList.remove("hidden");
-  const titles = { dashboard: "Dashboard", clients: "Clientes", partners: "Sócios", providers: "Provedores", revenue: "Relatórios", integrations: "Integrações", highlights: "Top 10 / Destaques", rtp: "RTP" };
+  const titles = {
+    dashboard: "Dashboard",
+    clients: "Clientes",
+    partners: "Sócios",
+    providers: "Provedores",
+    revenue: "Relatórios",
+    players: "Rastreio clientes",
+    integrations: "Integrações",
+    highlights: "Top 10 / Destaques",
+    rtp: "RTP",
+  };
   $("#view-title").textContent = titles[name] || name;
   if (name === "dashboard") loadDashboard();
   if (name === "clients") loadClientsView();
   if (name === "partners") loadPartnersView();
   if (name === "providers") loadProvidersCatalogView();
   if (name === "revenue") loadRevenueView();
+  if (name === "players") loadPlayersView();
   if (name === "integrations") loadIntegrationsView();
   if (name === "highlights") loadHighlightsView();
   if (name === "rtp") loadRtpView();
@@ -639,6 +650,231 @@ function renderBillingSummary(report) {
   syncReportModeHint();
 }
 
+function requireOperatorClientId() {
+  if (state.selectedClientId) return state.selectedClientId;
+  if (state.clients.length === 1) return state.clients[0].id;
+  return "";
+}
+
+async function runPaymentForensics() {
+  const box = $("#forensics-result");
+  if (!box) return;
+  box.classList.remove("hidden", "ok-border");
+  box.innerHTML = "<p class='hint'>Analisando prêmios duplicados e ganhadores…</p>";
+  try {
+    const data = await api("/billing/payment-forensics" + qs());
+    const dup = data.duplicateAwards || {};
+    const rec = data.reconciliation || {};
+    const win = data.winners || {};
+    const isDup = (dup.estimatedOverpaymentR$ ?? 0) >= 100;
+    if (!isDup) box.classList.add("ok-border");
+
+    const verdictLabels = {
+      EVIDENCE_DUPLICATE_CREDITS: "Evidência de crédito duplicado (retry Salsa)",
+      LIKELY_LEGITIMATE_WINNERS: "Provável ganho legítimo (sem duplicata forte)",
+      INCONCLUSIVE: "Inconclusivo — use também o script no back",
+    };
+
+    box.innerHTML = `
+      <p><strong>${verdictLabels[data.verdict] || data.verdict}</strong></p>
+      <div class="cards" style="margin-top:.75rem">
+        <div class="card"><div class="label">Estimativa pagamento a mais (bug)</div>
+          <div class="value ${isDup ? "bad" : "ok"}">${money(dup.estimatedOverpaymentR$)}</div>
+          <p class="hint">${dup.clusterCount ?? 0} grupos duplicados</p></div>
+        <div class="card"><div class="label">GGR casa (GameSpin)</div>
+          <div class="value">${money(rec.aggregateGgrHouse)}</div></div>
+        <div class="card"><div class="label">Lucro líquido jogadores (total)</div>
+          <div class="value">${money(rec.aggregatePlayerNet)}</div></div>
+        <div class="card"><div class="label">Top 25 ganhadores (soma)</div>
+          <div class="value bad">${money(win.sumTop25PlayerNet)}</div></div>
+      </div>
+      <ul>${(data.explanation || []).map((line) => `<li>${line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}</li>`).join("")}</ul>
+      ${(dup.topClusters || []).length ? `<h4 class="subhead">Maiores clusters duplicados</h4>
+        <table><thead><tr><th>Quando</th><th>ID back</th><th>Jogo</th><th>Prêmio</th><th>Excesso</th><th>Estimativa R$</th></tr></thead>
+        <tbody>${dup.topClusters.slice(0, 15).map((c) => `
+          <tr>
+            <td>${new Date(c.at).toLocaleString("pt-BR")}</td>
+            <td>${c.externalUserId}</td>
+            <td>${c.game}</td>
+            <td class="num">${money(c.winAmount)}</td>
+            <td class="num">${c.excessCredits}×</td>
+            <td class="num bad">${money(c.estimatedOverpayment)}</td>
+          </tr>`).join("")}
+        </tbody></table>` : ""}
+      <p class="hint" style="margin-top:.75rem">${(data.nextSteps || []).join(" · ")}</p>`;
+  } catch (e) {
+    box.innerHTML = `<p class="err-text">${e.message}</p>`;
+  }
+}
+
+async function loadIntegrityPanel() {
+  try {
+    const data = await api("/billing/integrity-check" + qs());
+    const s = data.summary || {};
+    setHtml("#integrity-summary", [
+      {
+        label: "Prêmios sem aposta pareada",
+        value: `${s.orphanAwards?.count ?? 0} · ${money(s.orphanAwards?.totalWin)}`,
+        cls: (s.orphanAwards?.count ?? 0) > 0 ? "bad" : "ok",
+        sub: s.orphanAwards?.description,
+      },
+      {
+        label: "Suspeita duplicata (retry)",
+        value: String(s.suspectedDuplicateWins?.count ?? 0),
+        cls: (s.suspectedDuplicateWins?.count ?? 0) > 0 ? "warn" : "ok",
+        sub: s.suspectedDuplicateWins?.description,
+      },
+      {
+        label: "Aviatrix — líq. jogadores",
+        value: money(s.aviatrix?.playerNet),
+        cls: (s.aviatrix?.playerNet ?? 0) > 0 ? "bad" : "ok",
+        sub: `Apostado ${money(s.aviatrix?.betAmount)} · Prêmios ${money(s.aviatrix?.winAmount)} · GGR casa ${money(s.aviatrix?.ggr)}`,
+      },
+      {
+        label: "spinId wallet reutilizado",
+        value: String(s.reusedWalletSpinIds ?? 0),
+        cls: (s.reusedWalletSpinIds ?? 0) > 0 ? "warn" : "ok",
+        sub: "Após deploy do fix, deve ficar 0",
+      },
+    ].map((c) => `
+      <div class="card">
+        <div class="label">${c.label}</div>
+        <div class="value ${c.cls || ""}">${c.value}</div>
+        ${c.sub ? `<p class="hint" style="margin:.35rem 0 0;font-size:.75rem">${c.sub}</p>` : ""}
+      </div>`).join(""));
+
+    setHtml("#integrity-orphans", (data.orphanSamples || []).length ? `<table>
+      <thead><tr><th>Quando</th><th>Cliente op.</th><th>ID back</th><th>Jogo</th><th>Prêmio</th><th>walletSpinId</th></tr></thead>
+      <tbody>${data.orphanSamples.map((r) => `
+        <tr>
+          <td>${new Date(r.at).toLocaleString("pt-BR")}</td>
+          <td>${r.client}</td>
+          <td><button type="button" class="ghost link-player-id" data-id="${r.externalUserId}">${r.externalUserId}</button></td>
+          <td>${r.game} (${r.provider})</td>
+          <td class="num bad">${money(r.win)}</td>
+          <td><code>${r.walletSpinId || "—"}</code></td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Nenhuma amostra no período.</p>");
+
+    setHtml("#integrity-duplicates", (data.duplicateCandidates || []).length ? `<table>
+      <thead><tr><th>Quando</th><th>ID back</th><th>Jogo</th><th>Valor</th><th>spin A</th><th>spin B</th></tr></thead>
+      <tbody>${data.duplicateCandidates.map((r) => `
+        <tr>
+          <td>${new Date(r.at).toLocaleString("pt-BR")}</td>
+          <td>${r.externalUserId}</td>
+          <td>${r.game}</td>
+          <td class="num">${money(r.win)}</td>
+          <td><code>${r.spinA || "—"}</code></td>
+          <td><code>${r.spinB || "—"}</code></td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Nenhuma duplicata heurística detectada.</p>");
+
+    $$("#integrity-orphans .link-player-id, #integrity-duplicates .link-player-id").forEach((btn) => {
+      btn.addEventListener("click", () => openPlayerDetail(btn.dataset.id));
+    });
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function openPlayerDetail(externalUserId) {
+  const clientId = requireOperatorClientId();
+  if (!clientId) {
+    showError("Selecione o operador (Zona) no filtro do topo antes de detalhar o jogador.");
+    return;
+  }
+  if (!externalUserId) return;
+  try {
+    const detail = await api("/billing/player-detail" + qs({ clientId, externalUserId }));
+    $("#player-detail-panel")?.classList.remove("hidden");
+    $("#player-detail-title").textContent = `Jogador #${externalUserId}`;
+    const t = detail.totals || {};
+    setHtml("#player-detail-totals", [
+      { label: "Apostado (total)", value: money(t.betAmount) },
+      { label: "Prêmios (total)", value: money(t.winAmount) },
+      { label: "Resultado jogador", value: money(t.playerNet), cls: t.playerNet > 0 ? "bad" : t.playerNet < 0 ? "ok" : "" },
+      { label: "GGR casa", value: money(t.ggr), cls: t.ggr < 0 ? "bad" : "ok" },
+      { label: "Linhas GameSpin", value: String(t.spins ?? 0) },
+    ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join(""));
+
+    setHtml("#player-detail-games", (detail.games || []).length ? `<table>
+      <thead><tr><th>Jogo</th><th>Provedor</th><th>Linhas</th><th>Apostado</th><th>Prêmios</th><th>Resultado jogador</th><th>GGR casa</th></tr></thead>
+      <tbody>${detail.games.map((g) => `
+        <tr>
+          <td>${g.game}</td>
+          <td>${g.provider}</td>
+          <td class="num">${g.spins}</td>
+          <td class="num">${money(g.betAmount)}</td>
+          <td class="num">${money(g.winAmount)}</td>
+          <td class="num ${g.playerNet > 0 ? "bad" : "ok"}">${money(g.playerNet)}</td>
+          <td class="num">${money(g.ggr)}</td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem jogos no período.</p>");
+
+    setHtml("#player-detail-rounds", (detail.recentRounds || []).length ? `<table>
+      <thead><tr><th>Quando</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>Líquido</th><th>Alertas</th></tr></thead>
+      <tbody>${detail.recentRounds.map((r) => `
+        <tr>
+          <td>${new Date(r.at).toLocaleString("pt-BR")}</td>
+          <td>${r.game}</td>
+          <td class="num">${money(r.bet)}</td>
+          <td class="num">${money(r.win)}</td>
+          <td class="num ${r.net > 0 ? "bad" : "ok"}">${money(r.net)}</td>
+          <td>${(r.flags || []).join(", ") || "—"}</td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem rodadas Salsa no período.</p>");
+
+    setHtml("#player-detail-events", (detail.recentEvents || []).length ? `<table>
+      <thead><tr><th>Quando</th><th>Tipo</th><th>Valor</th><th>Jogo</th><th>walletSpinId</th></tr></thead>
+      <tbody>${detail.recentEvents.map((e) => `
+        <tr>
+          <td>${new Date(e.at).toLocaleString("pt-BR")}</td>
+          <td>${e.kind}</td>
+          <td class="num">${money(e.amount)}</td>
+          <td>${e.game}</td>
+          <td><code>${e.walletSpinId || "—"}</code></td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem eventos.</p>");
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function loadPlayersView() {
+  showError("");
+  await loadIntegrityPanel();
+  try {
+    const data = await api("/billing/players-summary" + qs({ limit: 200 }));
+    const t = data.totals || {};
+    setHtml("#players-period-totals", [
+      { label: "Jogadores distintos", value: String(data.playerCount ?? 0) },
+      { label: "Apostado", value: money(t.betAmount) },
+      { label: "Prêmios", value: money(t.winAmount) },
+      { label: "GGR casa", value: money(t.ggr), cls: (t.ggr ?? 0) < 0 ? "bad" : "ok" },
+    ].map((c) => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`).join(""));
+
+    setHtml("#players-summary-table", (data.players || []).length ? `<table>
+      <thead><tr>
+        <th>ID back</th><th>Apostado</th><th>Prêmios</th><th>Resultado jogador</th><th>GGR casa</th><th>Linhas</th><th></th>
+      </tr></thead>
+      <tbody>${data.players.map((p) => `
+        <tr>
+          <td><strong>${p.externalUserId}</strong></td>
+          <td class="num">${money(p.betAmount)}</td>
+          <td class="num">${money(p.winAmount)}</td>
+          <td class="num ${p.playerNet > 0 ? "bad" : "ok"}">${money(p.playerNet)}</td>
+          <td class="num">${money(p.ggr)}</td>
+          <td class="num">${p.spins}</td>
+          <td><button type="button" class="ghost btn-open-player" data-id="${p.externalUserId}">Detalhe</button></td>
+        </tr>`).join("")}
+      </tbody></table>` : "<p class='hint'>Sem jogadores no período (filtre operador e datas).</p>");
+
+    $$(".btn-open-player").forEach((btn) => btn.addEventListener("click", () => openPlayerDetail(btn.dataset.id)));
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
 async function loadRevenueView() {
   showError("");
   state.billingSpinsPage = 1;
@@ -710,25 +946,38 @@ async function loadBillingSpins(page = 1) {
   const data = await api("/billing/spins" + qs({ page, pageSize: 25 }));
   setHtml("#billing-spins-table", data.spins.length ? `<table>
     <thead><tr>
-      <th>Data</th><th>Cliente</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>GGR</th>
-      ${clientMode ? "<th>% Cobrança</th><th>A pagar</th>" : "<th>% Salsa</th><th>% Cobrança</th>"}
+      <th>Data</th><th>ID back</th><th>Evento</th><th>Provedor</th><th>Jogo</th><th>Aposta</th><th>Prêmio</th><th>Líq. jogador</th>
+      ${clientMode ? "<th>% Cobr.</th><th>Taxa</th>" : "<th>% Salsa</th><th>% Cobr.</th>"}
     </tr></thead>
-    <tbody>${data.spins.map((s) => `
+    <tbody>${data.spins.map((s) => {
+      const playerNet = round2((s.winAmount || 0) - (s.betAmount || 0));
+      const ev = s.salsaKind || (s.betAmount > 0 && !s.winAmount ? "Aposta" : s.winAmount > 0 && !s.betAmount ? "Prêmio" : "—");
+      return `
       <tr>
         <td>${new Date(s.at).toLocaleString("pt-BR")}</td>
-        <td>${s.clientName}</td>
+        <td><button type="button" class="ghost link-player-id" data-id="${s.externalUserId || ""}">${s.externalUserId || "—"}</button></td>
+        <td>${ev}</td>
         <td>${s.provider}</td>
         <td>${s.game}</td>
         <td class="num">${money(s.betAmount)}</td>
         <td class="num">${money(s.winAmount)}</td>
-        <td class="num ${s.ggr < 0 ? "bad" : "ok"}">${money(s.ggr)}</td>
+        <td class="num ${playerNet > 0 ? "bad" : playerNet < 0 ? "ok" : ""}">${money(playerNet)}</td>
         ${clientMode ? `
         <td class="num">${s.chargePct}%</td>
         <td class="num">${money(s.chargeAmount)}</td>` : `
         <td class="num">${s.salsaPct}%</td>
         <td class="num">${s.chargePct}%</td>`}
-      </tr>`).join("")}
+      </tr>`;
+    }).join("")}
     </tbody></table>` : "<p class='hint'>Sem jogadas neste período.</p>");
+
+  $$(".link-player-id").forEach((btn) => btn.addEventListener("click", () => {
+    const id = btn.dataset.id;
+    if (!id) return;
+    $("#player-search-id").value = id;
+    setView("players");
+    openPlayerDetail(id);
+  }));
 
   const from = data.total ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = Math.min(data.page * data.pageSize, data.total);
@@ -1337,6 +1586,15 @@ function initUi() {
   $("#btn-billing-pdf")?.addEventListener("click", () => {
     showError("");
     printBillingPdf();
+  });
+
+  $("#btn-refresh-integrity")?.addEventListener("click", () => loadIntegrityPanel());
+  $("#btn-payment-forensics")?.addEventListener("click", () => runPaymentForensics());
+  $("#btn-player-search")?.addEventListener("click", () => {
+    openPlayerDetail(String($("#player-search-id")?.value || "").trim());
+  });
+  $("#btn-close-player-detail")?.addEventListener("click", () => {
+    $("#player-detail-panel")?.classList.add("hidden");
   });
 
   $("#btn-salsa-sync").addEventListener("click", async () => {

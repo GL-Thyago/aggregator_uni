@@ -357,6 +357,18 @@ textarea {
 
 .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
 .value.bad { color: #fca5a5; }
+.value.warn { color: #fde047; }
+.subhead { margin: 1rem 0 0.5rem; font-size: 0.95rem; color: var(--muted, #94a3b8); }
+.forensics-box {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.15);
+}
+.forensics-box.ok-border { border-color: rgba(34, 197, 94, 0.35); background: rgba(20, 83, 45, 0.12); }
+.forensics-box ul { margin: 0.5rem 0 0 1.1rem; }
+.forensics-box li { margin: 0.35rem 0; }
 
 @media print {
   .sidebar, .topbar, .nav, button, .inline-form { display: none !important; }

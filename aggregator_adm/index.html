@@ -46,6 +46,7 @@
         <button data-view="partners" class="nav">Sócios</button>
         <button data-view="providers" class="nav">Provedores</button>
         <button data-view="revenue" class="nav">Relatórios</button>
+        <button data-view="players" class="nav">Rastreio clientes</button>
         <button data-view="integrations" class="nav">Integrações</button>
         <button data-view="highlights" class="nav">Top 10 / Destaques</button>
         <button data-view="rtp" class="nav">RTP</button>
@@ -253,9 +254,54 @@
           <div class="table-wrap" id="billing-providers-table"></div>
         </div>
         <div class="panel">
-          <h3>Jogadas</h3>
+          <h3>Jogadas (linha a linha)</h3>
+          <p class="hint">PG/Salsa geram 2 linhas por rodada (aposta e prêmio). Use <strong>Rastreio clientes</strong> para totais por jogador e por jogo.</p>
           <div class="table-wrap" id="billing-spins-table"></div>
           <div class="table-pager" id="billing-spins-pager"></div>
+        </div>
+      </section>
+
+      <section id="view-players" class="view hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Auditoria de carteira</h3>
+            <div class="inline-form">
+              <button type="button" id="btn-payment-forensics">Verificar pagamentos indevidos</button>
+              <button type="button" id="btn-refresh-integrity" class="ghost">Atualizar</button>
+            </div>
+          </div>
+          <div id="forensics-result" class="forensics-box hidden"></div>
+          <p class="hint">Detecta prêmios sem aposta pareada, possíveis duplicatas (retry Salsa) e resumo Aviatrix. Não substitui o extrato Pix do operador — explica diferença GGR vs caixa real.</p>
+          <div class="cards" id="integrity-summary"></div>
+          <h4 class="subhead">Amostras — prêmio sem aposta registrada</h4>
+          <div class="table-wrap" id="integrity-orphans"></div>
+          <h4 class="subhead">Suspeitas — prêmio duplicado (heurística)</h4>
+          <div class="table-wrap" id="integrity-duplicates"></div>
+        </div>
+        <div class="panel">
+          <h3>Movimento por jogador</h3>
+          <p class="hint"><strong>ID cliente</strong> = número do usuário no back (externalUserId). Clique na linha ou busque abaixo.</p>
+          <div class="inline-form">
+            <label>ID no back
+              <input id="player-search-id" type="text" inputmode="numeric" placeholder="ex: 12345">
+            </label>
+            <button type="button" id="btn-player-search">Abrir detalhe</button>
+          </div>
+          <div class="cards" id="players-period-totals"></div>
+          <div class="table-wrap" id="players-summary-table"></div>
+        </div>
+        <div class="panel hidden" id="player-detail-panel">
+          <div class="panel-head">
+            <h3 id="player-detail-title">Detalhe do jogador</h3>
+            <button type="button" id="btn-close-player-detail" class="ghost">Fechar</button>
+          </div>
+          <div class="cards" id="player-detail-totals"></div>
+          <h4 class="subhead">Por jogo</h4>
+          <div class="table-wrap" id="player-detail-games"></div>
+          <h4 class="subhead">Rodadas (aposta + prêmio agrupados)</h4>
+          <div class="table-wrap" id="player-detail-rounds"></div>
+          <h4 class="subhead">Eventos Salsa recentes</h4>
+          <div class="table-wrap" id="player-detail-events"></div>
         </div>
       </section>
 
