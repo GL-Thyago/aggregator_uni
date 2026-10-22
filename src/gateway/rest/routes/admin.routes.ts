@@ -323,6 +323,32 @@ router.get("/billing/integrity-check", async (req, res) => {
   );
 });
 
+router.get("/billing/spin-audit-export", async (req, res) => {
+  const { getSpinAuditExport } = await import("../../../services/spin-audit-export.service.js");
+  res.json(
+    await getSpinAuditExport({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      externalUserId: req.query.externalUserId ? String(req.query.externalUserId) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    }),
+  );
+});
+
+router.get("/billing/spin-audit-export", async (req, res) => {
+  const { getSpinAuditExport } = await import("../../../services/spin-audit-export.service.js");
+  res.json(
+    await getSpinAuditExport({
+      since: req.query.since ? String(req.query.since) : undefined,
+      until: req.query.until ? String(req.query.until) : undefined,
+      clientId: req.query.clientId ? String(req.query.clientId) : undefined,
+      externalUserId: req.query.externalUserId ? String(req.query.externalUserId) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    }),
+  );
+});
+
 router.get("/billing/payment-forensics", async (req, res) => {
   const { getPaymentForensicsReport } = await import("../../../services/payment-forensics.service.js");
   res.json(

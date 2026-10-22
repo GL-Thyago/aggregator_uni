@@ -2,6 +2,7 @@ import axios from "axios";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { signWalletPayload } from "../lib/wallet-sign.js";
+import { withWalletUserQueue } from "./wallet-user-queue.js";
 
 export interface WalletClientConfig {
   walletUrl: string;
@@ -78,18 +79,20 @@ export async function processWalletSpin(
   config: WalletClientConfig,
   request: WalletSpinRequest,
 ): Promise<WalletSpinResponse> {
-  const url = `${config.walletUrl.replace(/\/$/, "")}/spin`;
+  return withWalletUserQueue(request.externalUserId, async () => {
+    const url = `${config.walletUrl.replace(/\/$/, "")}/spin`;
 
-  const { data } = await axios.post<WalletSpinResponse>(url, request, {
-    headers: walletHeaders(request, config.walletSecret),
-    timeout: 15_000,
+    const { data } = await axios.post<WalletSpinResponse>(url, request, {
+      headers: walletHeaders(request, config.walletSecret),
+      timeout: 15_000,
+    });
+
+    if (!data.ok) {
+      throw new Error(data.error ?? "Wallet rejected spin transaction");
+    }
+
+    return data;
   });
-
-  if (!data.ok) {
-    throw new Error(data.error ?? "Wallet rejected spin transaction");
-  }
-
-  return data;
 }
 
 function resolveWalletUrl(walletUrl: string): string {
